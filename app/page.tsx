@@ -5,7 +5,7 @@ import { ArrowRight, Scissors, MessageCircle, ChevronRight, ChevronLeft, Menu, C
 
 // --- SUB-COMPONENTS ---
 
-const ProductCard = ({ item, onSelect }: { item: any, onSelect: (item: any) => void }) => {
+const ProductCard = ({ item, onSelect, onOrder }: { item: any, onSelect: (item: any) => void, onOrder: (itemName: string) => void }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
 
   const nextImage = (e: React.MouseEvent) => {
@@ -18,8 +18,13 @@ const ProductCard = ({ item, onSelect }: { item: any, onSelect: (item: any) => v
     setCurrentIdx((prev) => (prev - 1 + item.images.length) % item.images.length);
   };
 
+  const handleOrderClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevents the modal from opening when they just want to order
+    onOrder(item.name);
+  };
+
   return (
-    <div className="group cursor-pointer" onClick={() => onSelect(item)}>
+    <div className="group cursor-pointer flex flex-col h-full" onClick={() => onSelect(item)}>
       <div className="relative aspect-[3/4] mb-4 overflow-hidden rounded-sm bg-slate-100 shadow-sm border border-slate-200/60">
         <img 
           src={item.images[currentIdx]} 
@@ -43,6 +48,16 @@ const ProductCard = ({ item, onSelect }: { item: any, onSelect: (item: any) => v
       </div>
       <h3 className="text-xl font-serif text-slate-900 group-hover:text-amber-700 transition">{item.name}</h3>
       <p className="text-amber-700 font-medium mb-4">{item.price}</p>
+      
+      {/* THE RESTORED ORDER BUTTON */}
+      <div className="mt-auto">
+        <button 
+          onClick={handleOrderClick}
+          className="w-full border border-slate-900 py-3 flex items-center justify-center gap-2 hover:bg-slate-900 hover:text-white transition duration-300"
+        >
+          Order via WhatsApp <MessageCircle size={16} />
+        </button>
+      </div>
     </div>
   );
 };
@@ -60,7 +75,7 @@ export default function JupiloFashionLanding() {
   const [course, setCourse] = useState("Beginner Pattern Drafting");
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   
-  // New States for FAQ & Newsletter
+  // States for FAQ & Newsletter
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [email, setEmail] = useState("");
 
@@ -226,7 +241,7 @@ export default function JupiloFashionLanding() {
             <p className="text-sm font-medium tracking-widest text-amber-700 uppercase">01 / Collections</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            {asoEbiCollection.map((item, i) => <ProductCard key={i} item={item} onSelect={setSelectedProduct} />)}
+            {asoEbiCollection.map((item, i) => <ProductCard key={i} item={item} onSelect={setSelectedProduct} onOrder={handleProductOrder} />)}
           </div>
         </section>
 
@@ -239,7 +254,7 @@ export default function JupiloFashionLanding() {
             <p className="text-sm font-medium tracking-widest text-amber-700 uppercase">02 / Collections</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            {mensCollection.map((item, i) => <ProductCard key={i} item={item} onSelect={setSelectedProduct} />)}
+            {mensCollection.map((item, i) => <ProductCard key={i} item={item} onSelect={setSelectedProduct} onOrder={handleProductOrder} />)}
           </div>
         </section>
 
@@ -252,7 +267,7 @@ export default function JupiloFashionLanding() {
             <p className="text-sm font-medium tracking-widest text-amber-700 uppercase">03 / Collections</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            {readyToWear.map((item, i) => <ProductCard key={i} item={item} onSelect={setSelectedProduct} />)}
+            {readyToWear.map((item, i) => <ProductCard key={i} item={item} onSelect={setSelectedProduct} onOrder={handleProductOrder} />)}
           </div>
         </section>
 
@@ -265,7 +280,7 @@ export default function JupiloFashionLanding() {
             <p className="text-sm font-medium tracking-widest text-amber-700 uppercase">04 / Collections</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            {bridalCollection.map((item, i) => <ProductCard key={i} item={item} onSelect={setSelectedProduct} />)}
+            {bridalCollection.map((item, i) => <ProductCard key={i} item={item} onSelect={setSelectedProduct} onOrder={handleProductOrder} />)}
           </div>
         </section>
       </div>
