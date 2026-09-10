@@ -104,21 +104,31 @@ export default function JupiloPublicSite() {
   const [academySuccess, setAcademySuccess] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // NEW: Academy Submit Handler
   const handleAcademySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAcademySubmitting(true);
-    // This will save to a new table we will create later called 'academy_applications'
-    const { error } = await supabase.from('academy_applications').insert([academyForm]);
-    setAcademySubmitting(false);
     
+    // Insert into the new table we just created
+    const { error } = await supabase
+      .from('academy_leads')
+      .insert([
+        { 
+          name: academyForm.name, 
+          email: academyForm.email, 
+          contact: academyForm.contact, 
+          experience: academyForm.experience 
+        }
+      ]);
+
     if (!error) {
       setAcademySuccess(true);
+      // Reset form
       setAcademyForm({ name: '', email: '', contact: '', experience: 'Beginner' });
-      setTimeout(() => setAcademySuccess(false), 5000);
     } else {
-      alert("Something went wrong. Please try again.");
+      console.error("Error submitting application:", error);
     }
+    
+    setAcademySubmitting(false);
   };
   
   // Product Modal States
