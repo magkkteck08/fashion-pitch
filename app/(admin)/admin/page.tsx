@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 
 export default function AdminDashboard() {
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
   const [loading, setLoading] = useState(true);
   const [counts, setCounts] = useState({ products: 0, events: 0, gallery: 0, enquiries: 0 });
   const [recentEnquiries, setRecentEnquiries] = useState<any[]>([]);

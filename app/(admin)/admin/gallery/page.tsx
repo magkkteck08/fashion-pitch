@@ -151,7 +151,7 @@ export default function AdminGallery() {
           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-amber-700" size={32} /></div>
         ) : gallery.length === 0 ? (
           <div className="text-center py-12 bg-white border border-slate-200 rounded-sm text-slate-500">
-            Your gallery is currently empty. Upload images using the batch uploader above.
+            Your gallery is currently empty. Upload images .
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
