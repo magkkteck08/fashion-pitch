@@ -102,6 +102,7 @@ export default function JupiloPublicSite() {
   const [academyForm, setAcademyForm] = useState({ name: '', email: '', contact: '', experience: 'Beginner' });
   const [academySubmitting, setAcademySubmitting] = useState(false);
   const [academySuccess, setAcademySuccess] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // NEW: Academy Submit Handler
   const handleAcademySubmit = async (e: React.FormEvent) => {
@@ -284,17 +285,47 @@ export default function JupiloPublicSite() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent"></div>
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent h-32"></div>
         
-        {/* Top Navigation */}
-        <nav className="absolute top-0 left-0 w-full p-6 flex justify-between items-center text-white z-20">
-          <div className="text-3xl font-serif font-bold tracking-widest drop-shadow-md">JUPILO.</div>
-          <div className="hidden md:flex gap-8 text-sm tracking-widest uppercase font-medium">
-            <a href="#collections" className="hover:text-amber-400 transition drop-shadow-md">Collections</a>
-            <a href="#events" className="hover:text-amber-400 transition drop-shadow-md">Events</a>
-            <a href="#academy" className="hover:text-amber-400 transition drop-shadow-md">Academy</a>
-            <a href="#contact" className="hover:text-amber-400 transition drop-shadow-md">Contact</a>
+        {/* NAVIGATION BAR */}
+      {/* NAVIGATION BAR */}
+      <nav className="fixed top-0 left-0 w-full z-50 bg-[#FDFBF7]/90 backdrop-blur-md border-b border-slate-200 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-6 md:px-16 h-20 flex items-center justify-between">
+          
+          {/* Logo */}
+          <div className="text-2xl font-serif font-bold tracking-widest text-slate-900">
+            JUPILO.
           </div>
-          <button className="md:hidden drop-shadow-md"><Menu size={28} /></button>
-        </nav>
+
+          {/* Desktop Menu */}
+          <div className="hidden md:flex gap-8 text-[10px] font-medium tracking-widest uppercase text-slate-500">
+            <a href="#collections" className="hover:text-amber-700 transition duration-300">Collections</a>
+            <a href="#events" className="hover:text-amber-700 transition duration-300">Runway & Events</a>
+            <a href="#academy" className="hover:text-amber-700 transition duration-300">Academy</a>
+            <a href="#founder" className="hover:text-amber-700 transition duration-300">The Designer</a>
+          </div>
+
+          {/* Mobile Toggle Button */}
+          <button 
+            className="md:hidden text-slate-900 hover:text-amber-700 transition" 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+
+        {/* Mobile Dropdown Menu */}
+        <div 
+          className={`md:hidden absolute top-20 left-0 w-full bg-white border-b border-slate-200 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
+            isMobileMenuOpen ? 'max-h-72 opacity-100 py-6' : 'max-h-0 opacity-0 py-0'
+          }`}
+        >
+          <div className="flex flex-col px-6 gap-6 text-xs tracking-widest uppercase font-medium text-slate-600">
+            <a href="#collections" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-amber-700">Collections</a>
+            <a href="#events" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-amber-700">Runway & Events</a>
+            <a href="#academy" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-amber-700">Academy</a>
+            <a href="#founder" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-amber-700">The Designer</a>
+          </div>
+        </div>
+      </nav>
         
         {/* Clean, box-free typography */}
         <div className="relative z-10 mt-20 max-w-2xl">
