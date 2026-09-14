@@ -1,13 +1,29 @@
 "use client";
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { LayoutDashboard, ShoppingBag, Calendar, Image as ImageIcon, MessageSquare, LogOut, Scissors, BookOpen, Menu, X } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const router = useRouter();
 
   // Helper to close menu when a link is clicked on mobile
   const closeMenu = () => setIsMobileOpen(false);
+
+  const handleSignOut = () => {
+    if (!confirm("Are you sure you want to sign out?")) return;
+
+    // Destroy the custom auth cookie
+    document.cookie = "admin_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    
+    // Destroy localStorage backup
+    localStorage.removeItem('admin_auth');
+    localStorage.clear(); 
+
+    // Force redirect to the public homepage
+    window.location.href = '/'; 
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex font-sans">
@@ -64,7 +80,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         <div className="p-4 border-t border-slate-800">
-          <button className="flex items-center gap-3 px-4 py-3 w-full text-left text-slate-400 hover:text-white hover:text-red-400 transition">
+          <button onClick={handleSignOut} className="flex items-center gap-3 px-4 py-3 w-full text-left text-slate-400 hover:text-white hover:text-red-400 transition">
             <LogOut size={20} /> Sign Out
           </button>
         </div>
