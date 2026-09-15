@@ -1,13 +1,19 @@
 "use client";
 import { useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, ShoppingBag, Calendar, Image as ImageIcon, MessageSquare, LogOut, Scissors, BookOpen, Menu, X } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Star, Calendar, Image as ImageIcon, MessageSquare, LogOut, Scissors, BookOpen, Menu, X } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
-  // Helper to close menu when a link is clicked on mobile
   const closeMenu = () => setIsMobileOpen(false);
+
+  const handleSignOut = () => {
+    if (!confirm("Are you sure you want to sign out?")) return;
+    document.cookie = "admin_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    localStorage.removeItem('admin_auth');
+    localStorage.clear(); 
+    window.location.href = '/'; 
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex font-sans">
