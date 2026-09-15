@@ -1,20 +1,26 @@
 "use client";
 import { useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, ShoppingBag, Calendar, Image as ImageIcon, MessageSquare, LogOut, Scissors, BookOpen, Menu, X } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Star, Calendar, Image as ImageIcon, MessageSquare, LogOut, Scissors, BookOpen, Menu, X } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
-  // Helper to close menu when a link is clicked on mobile
   const closeMenu = () => setIsMobileOpen(false);
+
+  const handleSignOut = () => {
+    if (!confirm("Are you sure you want to sign out?")) return;
+    document.cookie = "admin_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    localStorage.removeItem('admin_auth');
+    localStorage.clear(); 
+    window.location.href = '/'; 
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex font-sans">
       
       {/* MOBILE TOP NAVIGATION BAR */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 text-white flex items-center justify-between px-6 z-50 border-b border-slate-800">
-        <div className="text-xl font-serif font-bold tracking-widest">JUPILO.</div>
+        <div className="text-xl font-serif font-bold tracking-widest">LUXE & CO.</div>
         <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="text-white hover:text-amber-500 transition">
           {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -22,10 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* MOBILE DARK OVERLAY */}
       {isMobileOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
-          onClick={closeMenu}
-        />
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={closeMenu} />
       )}
 
       {/* SIDEBAR */}
@@ -35,7 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         md:translate-x-0 md:flex
       `}>
         <div className="p-6 border-b border-slate-800 hidden md:block">
-          <div className="text-2xl font-serif font-bold tracking-widest">JUPILO.</div>
+          <div className="text-2xl font-serif font-bold tracking-widest">LUXE & CO.</div>
           <p className="text-xs text-amber-500 uppercase tracking-widest mt-1">Admin Portal</p>
         </div>
         
@@ -43,8 +46,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link onClick={closeMenu} href="/admin" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-sm transition">
             <LayoutDashboard size={20} /> Dashboard
           </Link>
+          <Link onClick={closeMenu} href="/admin/signature" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 bg-white/5 border-l-2 border-amber-500 rounded-sm transition text-amber-500">
+            <Star size={20} /> Signature Hair
+          </Link>
           <Link onClick={closeMenu} href="/admin/products" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-sm transition">
-            <ShoppingBag size={20} /> Products
+            <ShoppingBag size={20} /> Handbags
           </Link>
           <Link onClick={closeMenu} href="/admin/events" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-sm transition">
             <Calendar size={20} /> Events
@@ -52,8 +58,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link onClick={closeMenu} href="/admin/gallery" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-sm transition">
             <ImageIcon size={20} /> Gallery
           </Link>
-          <Link onClick={closeMenu} href="/admin/transformations" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 bg-white/5 border-l-2 border-amber-500 rounded-sm transition">
-            <Scissors size={20} className="text-amber-500" /> Showcases
+          <Link onClick={closeMenu} href="/admin/transformations" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-sm transition">
+            <Scissors size={20} /> Showcases
           </Link>
           <Link onClick={closeMenu} href="/admin/academy" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-sm transition">
             <BookOpen size={20} /> Academy Leads
@@ -64,14 +70,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         <div className="p-4 border-t border-slate-800">
-          <button className="flex items-center gap-3 px-4 py-3 w-full text-left text-slate-400 hover:text-white hover:text-red-400 transition">
+          <button onClick={handleSignOut} className="flex items-center gap-3 px-4 py-3 w-full text-left text-slate-400 hover:text-white hover:text-red-400 transition">
             <LogOut size={20} /> Sign Out
           </button>
         </div>
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 pt-24 md:pt-8 overflow-y-auto w-full">
+      <main className="flex-1 md:ml-64 p-4 md:p-8 pt-24 md:pt-8 overflow-y-auto w-full text-slate-900">
         {children}
       </main>
     </div>

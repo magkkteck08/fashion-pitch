@@ -4,7 +4,7 @@ import { ArrowRight, MessageCircle, Menu, MapPin, Star, X, BookOpen, Loader2, Ch
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 
-// HELPER FUNCTION: Forces Supabase array strings to become real arrays
+// HELPER FUNCTION
 const parseSupabaseArray = (data: any) => {
   if (!data) return [];
   if (Array.isArray(data)) return data;
@@ -19,47 +19,49 @@ const parseSupabaseArray = (data: any) => {
   return [];
 };
 
-// PRODUCT CARD COMPONENT (Now with gallery indicator)
+// PRODUCT CARD (Reusable for both catalogs)
 const ProductCard = ({ item, onSelect }: { item: any, onSelect: (item: any) => void }) => {
   const extraImages = parseSupabaseArray(item.additional_images);
   const totalImages = extraImages.length > 0 ? extraImages.length + 1 : 1;
 
   return (
-    <div className="group cursor-pointer flex flex-col h-full" onClick={() => onSelect(item)}>
-      <div className="relative aspect-[3/4] mb-4 overflow-hidden rounded-sm bg-slate-100 shadow-sm border border-slate-200">
+    <div 
+      className="group cursor-pointer flex flex-col h-full min-w-[80vw] sm:min-w-[45vw] md:min-w-0 snap-center relative z-10" 
+      onClick={() => onSelect(item)}
+    >
+      <div className="relative aspect-[4/5] mb-4 overflow-hidden rounded-sm bg-slate-100 shadow-sm border border-slate-200">
         <img
-          src={item.image_url || "https://placehold.co/600x800/eeeeee/999999?text=No+Image"}
+          src={item.image_url || "https://placehold.co/800x1000/eeeeee/999999?text=No+Image"}
           alt={item.name}
           className="w-full h-full object-cover transition duration-700 group-hover:scale-105"
         />
         <div className="absolute top-3 left-3 bg-white/90 text-slate-900 text-[10px] uppercase tracking-widest px-3 py-1 rounded-full">
           {item.category}
         </div>
-        {/* HOMEPAGE INDICATOR: Shows if product has multiple pics */}
         {totalImages > 1 && (
           <div className="absolute top-3 right-3 bg-black/70 text-white text-[10px] tracking-widest px-2 py-1 rounded-sm backdrop-blur-md flex items-center gap-1">
             <ImageIcon size={10} /> {totalImages}
           </div>
         )}
       </div>
-      <h3 className="text-lg font-serif text-slate-900 group-hover:text-amber-700 transition">{item.name}</h3>
+      <h3 className="text-lg font-serif text-slate-900 group-hover:text-amber-700 transition line-clamp-1">{item.name}</h3>
       <p className="text-amber-700 font-medium mb-4">₦{item.price?.toLocaleString()}</p>
       <div className="mt-auto">
         <button 
           onClick={(e) => { e.stopPropagation(); onSelect(item); }} 
-          className="w-full border border-slate-900 py-2 flex items-center justify-center gap-2 hover:bg-slate-900 hover:text-white transition rounded-sm text-[11px] font-medium tracking-widest uppercase"
+          className="w-full border border-slate-900 py-3 flex items-center justify-center gap-2 hover:bg-slate-900 hover:text-white transition rounded-sm text-[11px] font-medium tracking-widest uppercase"
         >
-          Order Now
+          Book / Order Now
         </button>
       </div>
     </div>
   );
 };
 
-// EVENT TEASER CARD COMPONENT
+// EVENT CARD
 const EventCard = ({ ev, mounted }: { ev: any, mounted: boolean }) => {
   return (
-    <Link href={`/events/${ev.slug}`} className="group border border-slate-700 rounded-sm flex flex-col md:flex-row overflow-hidden bg-slate-800/50 hover:border-amber-500 transition duration-300 h-full">
+    <Link href={`/events/${ev.slug}`} className="group border border-slate-700 rounded-sm flex flex-col md:flex-row overflow-hidden bg-slate-800/50 hover:border-amber-500 transition duration-300 h-full relative z-10">
       <div className="w-full md:w-2/5 aspect-[4/3] md:aspect-auto relative overflow-hidden bg-black">
         <img src={ev.cover_image || "https://placehold.co/600x800"} alt={ev.title} className="w-full h-full object-cover object-top group-hover:scale-105 transition duration-700" />
         <div className="absolute top-4 left-4 bg-black/80 text-white text-[10px] uppercase tracking-widest px-3 py-1 rounded-sm border border-slate-600 backdrop-blur-sm">
@@ -80,19 +82,23 @@ const EventCard = ({ ev, mounted }: { ev: any, mounted: boolean }) => {
         <p className="text-slate-400 text-sm mb-6 line-clamp-2">{ev.description}</p>
         <div className="mt-auto flex items-center justify-between text-sm tracking-widest uppercase text-amber-500 font-medium">
           <span className="flex items-center gap-2"><MapPin size={14} /> {ev.location || "TBA"}</span>
-          <span className="group-hover:translate-x-2 transition-transform">Read Recap →</span>
+          <span className="group-hover:translate-x-2 transition-transform">Read Details →</span>
         </div>
       </div>
     </Link>
   );
 };
 
-export default function JupiloPublicSite() {
+export default function LuxePublicSite() {
   const WHATSAPP_NUMBER = "2349073754047";
   const supabase = createClient();
   
   const [mounted, setMounted] = useState(false);
+  
+  // SEPARATE STATES FOR TWO DIFFERENT PRODUCT LISTS
+  const [signatureProducts, setSignatureProducts] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  
   const [events, setEvents] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>([]);
   const [academyCourses, setAcademyCourses] = useState<any[]>([]);
@@ -103,66 +109,42 @@ export default function JupiloPublicSite() {
   const [academySubmitting, setAcademySubmitting] = useState(false);
   const [academySuccess, setAcademySuccess] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const handleAcademySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAcademySubmitting(true);
-    
-    // Insert into the new table we just created
-    const { error } = await supabase
-      .from('academy_leads')
-      .insert([
-        { 
-          name: academyForm.name, 
-          email: academyForm.email, 
-          contact: academyForm.contact, 
-          experience: academyForm.experience 
-        }
-      ]);
-
-    if (!error) {
-      setAcademySuccess(true);
-      // Reset form
-      setAcademyForm({ name: '', email: '', contact: '', experience: 'Beginner' });
-    } else {
-      console.error("Error submitting application:", error);
-    }
-    
-    setAcademySubmitting(false);
-  };
   
-  // Product Modal States
+  const [visibleSignatureCount, setVisibleSignatureCount] = useState(4);
+  const [visibleCount, setVisibleCount] = useState(8);
+
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [productImages, setProductImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  // NEW: State to control how many products show on the grid
-  const [visibleCount, setVisibleCount] = useState(8);
-
   const [contactForm, setContactForm] = useState({ name: '', contact: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
- useEffect(() => {
+  useEffect(() => {
     setMounted(true);
     async function loadData() {
+      // 1. Fetch main catalog (e.g., Bags/Accessories)
       const { data: prodData } = await supabase.from('products').select('*');
-      const { data: eventData } = await supabase.from('events').select('*').order('event_date', { ascending: true });
-      const { data: galData } = await supabase.from('gallery').select('*').limit(12);
-      const { data: acadData, error: acadError } = await supabase.from('academy').select('*').limit(3);
       
-      // 'as any' bypasses the strict TypeScript error for the new table
+      // 2. Fetch NEW signature collection (e.g., Premium Hair Styles)
+      const { data: sigData } = await supabase.from('signature_products' as any).select('*');
+      
+      const { data: eventData } = await supabase.from('events').select('*').order('event_date', { ascending: true });
+      const { data: galData } = await supabase.from('gallery').select('*').limit(16);
+      const { data: acadData } = await supabase.from('academy').select('*').limit(3);
       const { data: transData } = await supabase.from('transformations' as any).select('*').limit(2);
       
       if (prodData) setProducts(prodData);
+      if (sigData) setSignatureProducts(sigData);
       if (eventData) setEvents(eventData);
       if (galData) setGallery(galData);
-      if (acadData && !acadError) setAcademyCourses(acadData);
+      if (acadData) setAcademyCourses(acadData);
       if (transData) setTransformations(transData);
     }
     loadData();
-  }, []);
+  }, [supabase]);
 
   const handleSelectProduct = (item: any) => {
     const extraImages = parseSupabaseArray(item.additional_images);
@@ -171,20 +153,31 @@ export default function JupiloPublicSite() {
     setSelectedProduct(item);
   };
 
-  // Scroll handler for updating the "1/3" counter when dragging/swiping
   const handleModalScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     const width = e.currentTarget.clientWidth;
     setCurrentImageIndex(Math.round(scrollLeft / width));
   };
 
-  // Button handler for desktop arrow clicks
   const slideGallery = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
       const { clientWidth } = scrollRef.current;
       const scrollAmount = direction === 'left' ? -clientWidth : clientWidth;
       scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
+  };
+
+  const handleAcademySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAcademySubmitting(true);
+    const { error } = await supabase.from('academy_leads').insert([
+      { name: academyForm.name, email: academyForm.email, contact: academyForm.contact, experience: academyForm.experience }
+    ]);
+    if (!error) {
+      setAcademySuccess(true);
+      setAcademyForm({ name: '', email: '', contact: '', experience: 'Beginner' });
+    }
+    setAcademySubmitting(false);
   };
 
   const handleContactSubmit = async (e: React.FormEvent) => {
@@ -196,8 +189,6 @@ export default function JupiloPublicSite() {
       setSubmitSuccess(true);
       setContactForm({ name: '', contact: '', message: '' });
       setTimeout(() => setSubmitSuccess(false), 5000);
-    } else {
-      alert("Something went wrong. Please try again.");
     }
   };
 
@@ -214,7 +205,6 @@ export default function JupiloPublicSite() {
               <X size={20} />
             </button>
             
-            {/* LEFT SIDE: Swipeable Image Gallery */}
             <div className="w-full md:w-1/2 h-[45vh] md:h-[80vh] bg-slate-100 relative group">
               <div 
                 ref={scrollRef}
@@ -224,24 +214,15 @@ export default function JupiloPublicSite() {
               >
                 {productImages.map((img, idx) => (
                   <div key={idx} className="min-w-full h-full snap-center relative shrink-0 flex items-center justify-center">
-                    <img 
-                      src={img} 
-                      className="w-full h-full object-contain object-center" 
-                      alt={`${selectedProduct.name} - Angle ${idx + 1}`} 
-                    />
+                    <img src={img} className="w-full h-full object-cover object-center" alt={`${selectedProduct.name} - Angle ${idx + 1}`} />
                   </div>
                 ))}
               </div>
 
-              {/* Desktop Left/Right Navigation Arrows */}
               {productImages.length > 1 && (
                 <>
-                  <button onClick={() => slideGallery('left')} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-black p-2 rounded-full shadow-md backdrop-blur-md transition opacity-0 group-hover:opacity-100 hidden md:block">
-                    <ChevronLeft size={20} />
-                  </button>
-                  <button onClick={() => slideGallery('right')} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-black p-2 rounded-full shadow-md backdrop-blur-md transition opacity-0 group-hover:opacity-100 hidden md:block">
-                    <ChevronRight size={20} />
-                  </button>
+                  <button onClick={() => slideGallery('left')} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-black p-2 rounded-full shadow-md backdrop-blur-md transition opacity-0 group-hover:opacity-100 hidden md:block"><ChevronLeft size={20} /></button>
+                  <button onClick={() => slideGallery('right')} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-black p-2 rounded-full shadow-md backdrop-blur-md transition opacity-0 group-hover:opacity-100 hidden md:block"><ChevronRight size={20} /></button>
                   <div className="absolute bottom-6 right-6 bg-black/60 text-white text-[10px] tracking-widest px-3 py-1.5 rounded-sm backdrop-blur-md pointer-events-none transition-all">
                     {currentImageIndex + 1} / {productImages.length}
                   </div>
@@ -249,7 +230,6 @@ export default function JupiloPublicSite() {
               )}
             </div>
             
-            {/* RIGHT SIDE: Details & Actions */}
             <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col h-[45vh] md:h-[80vh] overflow-y-auto">
               <div className="text-xs text-amber-700 uppercase tracking-widest mb-2">{selectedProduct.category}</div>
               <h2 className="text-3xl md:text-5xl font-serif mb-2 text-slate-900">{selectedProduct.name}</h2>
@@ -263,217 +243,346 @@ export default function JupiloPublicSite() {
               
               <div className="flex flex-col sm:flex-row gap-4 mt-auto pt-8 border-t border-slate-100 shrink-0">
                 <button 
-                  onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi Jupilo, I want to order the ${selectedProduct.name} for ₦${selectedProduct.price?.toLocaleString()}.`, '_blank')}
+                  onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi LUXE CO., I want to book/order the ${selectedProduct.name} for ₦${selectedProduct.price?.toLocaleString()}.`, '_blank')}
                   className="flex-1 bg-slate-900 text-white py-4 px-2 text-[11px] font-medium tracking-widest uppercase rounded-sm hover:bg-slate-800 transition text-center"
                 >
-                  Order Now
+                  Order / Book Now
                 </button>
                 <button 
-                  onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi Jupilo, I have an enquiry about the ${selectedProduct.name}.`, '_blank')}
+                  onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi LUXE CO., I have an enquiry about the ${selectedProduct.name}.`, '_blank')}
                   className="flex-1 bg-transparent border border-slate-900 text-slate-900 py-4 px-2 text-[11px] font-medium tracking-widest uppercase rounded-sm hover:bg-slate-50 transition text-center"
                 >
                   Make Enquiry
                 </button>
               </div>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* HERO SECTION */}
-      <section className="relative h-screen w-full flex flex-col justify-center px-6 md:px-16 overflow-hidden bg-black">
-        {/* The Base Image - Enhanced with CSS filters to make it shine and pop! */}
+      {/* 1. HERO SECTION */}
+      <section className="relative h-screen w-full flex flex-col justify-center px-6 md:px-16 bg-black">
         <img 
           src="/hero.jpg" 
-          alt="Jupilo Fashion" 
-          className="absolute inset-0 w-full h-full object-cover saturate-[1.25] brightness-110 contrast-[1.05]" 
+          alt="Luxe Hair & Fashion" 
+          className="absolute inset-0 w-full h-full object-cover saturate-[1.1] brightness-[0.8] contrast-[1.1]" 
           onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/2000x1200/222222/666666?text=Hero" }} 
         />
         
-        {/* A smooth, invisible side-gradient. Darker on the left for text, fading completely clear on the right */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent h-32"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent h-32"></div>
         
         {/* NAVIGATION BAR */}
-      {/* NAVIGATION BAR */}
-      <nav className="fixed top-0 left-0 w-full z-50 bg-[#FDFBF7]/90 backdrop-blur-md border-b border-slate-200 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-6 md:px-16 h-20 flex items-center justify-between">
-          
-          {/* Logo */}
-          <div className="text-2xl font-serif font-bold tracking-widest text-slate-900">
-            JUPILO.
-          </div>
-
-          {/* Desktop Menu */}
-          <div className="hidden md:flex gap-8 text-[10px] font-medium tracking-widest uppercase text-slate-500">
-            <a href="#collections" className="hover:text-amber-700 transition duration-300">Collections</a>
-            <a href="#events" className="hover:text-amber-700 transition duration-300">Runway & Events</a>
-            <a href="#academy" className="hover:text-amber-700 transition duration-300">Academy</a>
-            <a href="#founder" className="hover:text-amber-700 transition duration-300">The Designer</a>
-          </div>
-
-          {/* Mobile Toggle Button */}
-          <button 
-            className="md:hidden text-slate-900 hover:text-amber-700 transition" 
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-
-        {/* Mobile Dropdown Menu */}
-        <div 
-          className={`md:hidden absolute top-20 left-0 w-full bg-white border-b border-slate-200 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
-            isMobileMenuOpen ? 'max-h-72 opacity-100 py-6' : 'max-h-0 opacity-0 py-0'
-          }`}
-        >
-          <div className="flex flex-col px-6 gap-6 text-xs tracking-widest uppercase font-medium text-slate-600">
-            <a href="#collections" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-amber-700">Collections</a>
-            <a href="#events" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-amber-700">Runway & Events</a>
-            <a href="#academy" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-amber-700">Academy</a>
-            <a href="#founder" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-amber-700">The Designer</a>
-          </div>
-        </div>
-      </nav>
-        
-        {/* Clean, box-free typography */}
-        <div className="relative z-10 mt-20 max-w-2xl">
-          <h1 className="text-5xl md:text-7xl font-serif leading-[1.1] mb-6 text-white drop-shadow-xl">
-            WEAR YOUR <br />CONFIDENCE.
-          </h1>
-          <p className="text-base md:text-xl font-light mb-10 max-w-xl text-gray-100 drop-shadow-lg leading-relaxed">
-            Contemporary fashion, thoughtfully designed and crafted for women who want to stand out.
-          </p>
-          
-          <a 
-            href="#collections" 
-            className="inline-block bg-white text-black px-10 py-4 text-center font-medium uppercase tracking-widest text-xs hover:bg-slate-200 transition rounded-sm shadow-2xl"
-          >
-            Explore Collection
-          </a>
-        </div>
-      </section>
-
-      {/* ABOUT / FOUNDER SECTION */}
-      <section id="founder" className="relative py-32 px-6 md:px-16 max-w-7xl mx-auto flex flex-col md:flex-row gap-16 md:gap-24 items-center bg-white overflow-hidden">
-        
-        {/* Decorative blurred blobs to make the glassmorphism visible */}
-        <div className="absolute top-10 left-0 w-72 h-72 bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl opacity-70"></div>
-        <div className="absolute bottom-10 left-32 w-72 h-72 bg-slate-100 rounded-full mix-blend-multiply filter blur-3xl opacity-70"></div>
-
-        {/* Left Side: Glassmorphic Image Container */}
-        <div className="w-full md:w-1/2 relative mt-8 md:mt-0 z-10">
-          {/* The offset frame */}
-          <div className="absolute top-6 -left-6 w-full h-full border border-amber-700/20 rounded-2xl hidden md:block"></div>
-          
-          {/* The Frosted Glass Frame */}
-          <div className="relative w-full aspect-[4/5] p-3 md:p-5 rounded-2xl bg-white/40 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)] group">
-            <div className="relative w-full h-full overflow-hidden rounded-xl">
-              <img 
-                src="/founder.jpg" 
-                alt="Jupilo - The Designer" 
-                className="w-full h-full object-cover transition-transform duration-[2s] ease-in-out group-hover:scale-110" 
-                onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/800x1000/eeeeee/999999?text=Founder+Image" }} 
-              />
+        <nav className="fixed top-0 left-0 w-full z-50 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-slate-200 transition-all duration-300">
+          <div className="max-w-7xl mx-auto px-6 md:px-16 h-20 flex items-center justify-between">
+            <div className="text-2xl font-serif font-bold tracking-widest text-slate-900">LUXE & CO.</div>
+            <div className="hidden md:flex gap-8 text-[10px] font-medium tracking-widest uppercase text-slate-500">
+              <a href="#signature" className="hover:text-amber-700 transition duration-300">Signature Hair</a>
+              <a href="#collections" className="hover:text-amber-700 transition duration-300">Handbags</a>
+              <a href="#lookbook" className="hover:text-amber-700 transition duration-300">Past Work</a>
+              <a href="#academy" className="hover:text-amber-700 transition duration-300">Academy</a>
             </div>
-          </div>
-        </div>
-        
-        {/* Right Side: Premium Typography and Expanded Copy */}
-        <div className="w-full md:w-1/2 flex flex-col justify-center z-10 relative">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-[1px] bg-amber-700"></div>
-            <h2 className="text-xs font-medium tracking-widest text-amber-700 uppercase">The Designer</h2>
-          </div>
-          
-          <h3 className="text-4xl md:text-6xl font-serif text-slate-900 leading-tight mb-8">Meet Jupilo.</h3>
-          
-          <div className="space-y-6 text-slate-600 text-base md:text-lg leading-relaxed font-light">
-            <p>
-              <span className="font-medium text-slate-900">Jupilo is more than a fashion label;</span> it is a celebration of structure, elegance, and unapologetic confidence.
-            </p>
-            <p>
-              Starting the journey with a sheer passion for tailoring, Jupilo spent years mastering the delicate balance between rich traditional craftsmanship and contemporary global aesthetics. Every sketch is intentional. Every silhouette is engineered to flatter, empower, and command the room.
-            </p>
-            
-            {/* Signature Quote */}
-            <div className="pt-6 mt-6">
-              <blockquote className="pl-6 border-l-2 border-amber-500 italic text-slate-800 font-serif text-xl md:text-2xl leading-relaxed">
-                "My ultimate goal is not just to dress a woman, but to arm her for the world."
-              </blockquote>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* COLLECTIONS */}
-      <section id="collections" className="py-24 px-6 md:px-16 max-w-7xl mx-auto bg-white border-y border-slate-100">
-        <h2 className="text-3xl md:text-5xl font-serif text-slate-900 mb-12">Latest Collection</h2>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-          {products.slice(0, visibleCount).map((item) => (
-            <ProductCard key={item.id} item={item} onSelect={handleSelectProduct} />
-          ))}
-        </div>
-
-        {/* LOAD MORE BUTTON */}
-        {visibleCount < products.length && (
-          <div className="mt-16 text-center">
-            <button 
-              onClick={() => setVisibleCount(prev => prev + 4)} 
-              className="border border-slate-900 text-slate-900 px-10 py-4 uppercase tracking-widest text-sm font-medium hover:bg-slate-900 hover:text-white transition rounded-sm"
-            >
-              Load More
+            <button className="md:hidden text-slate-900 hover:text-amber-700 transition" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
-        )}
+
+          <div className={`md:hidden absolute top-20 left-0 w-full bg-white border-b border-slate-200 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-80 opacity-100 py-6' : 'max-h-0 opacity-0 py-0'}`}>
+            <div className="flex flex-col px-6 gap-6 text-xs tracking-widest uppercase font-medium text-slate-600">
+              <a href="#signature" onClick={() => setIsMobileMenuOpen(false)}>Signature Hair</a>
+              <a href="#collections" onClick={() => setIsMobileMenuOpen(false)}>Handbags</a>
+              <a href="#lookbook" onClick={() => setIsMobileMenuOpen(false)}>Past Work</a>
+              <a href="#academy" onClick={() => setIsMobileMenuOpen(false)}>Academy</a>
+            </div>
+          </div>
+        </nav>
+        
+        <div className="relative z-10 mt-20 max-w-3xl">
+          <h1 className="text-5xl md:text-7xl font-serif leading-[1.1] mb-6 text-white drop-shadow-xl">
+            CROWNED IN <br />ELEGANCE.
+          </h1>
+          <p className="text-base md:text-xl font-light mb-10 max-w-xl text-gray-200 drop-shadow-lg leading-relaxed">
+            Premium hair braiding, exceptional crown care, and curated luxury handbags for the unapologetic woman.
+          </p>
+          <a href="#signature" className="inline-block bg-white text-black px-10 py-4 text-center font-medium uppercase tracking-widest text-xs hover:bg-amber-50 transition rounded-sm shadow-2xl">
+            Explore Offerings
+          </a>
+        </div>
+
+        {/* DIVIDER: Hero to Signature */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[50px] md:h-[100px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118,137.9,114,207.2,104.9,245.8,99.8,284.1,89.5,321.39,56.44Z" className="fill-white"></path>
+          </svg>
+        </div>
       </section>
 
-      {/* EVENTS SECTION */}
-      <section id="events" className="py-24 px-6 md:px-16 bg-slate-900 text-white">
+      {/* 2. SIGNATURE ARRIVALS (Database Table 1) */}
+      <section id="signature" className="relative pt-20 pb-32 px-6 md:px-16 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-6xl font-serif mb-4">WHERE FASHION COMES ALIVE.</h2>
-            <p className="text-slate-400">Join us at our upcoming showcases, recaps, and masterclasses.</p>
+          <div className="flex justify-between items-end mb-12 relative z-10">
+            <div>
+              <h2 className="text-xs font-medium tracking-widest text-amber-700 uppercase mb-2">Premium Hair</h2>
+              <h3 className="text-3xl md:text-5xl font-serif text-slate-900">Signature Styles</h3>
+            </div>
+            {/* Desktop Navigation Arrows */}
+            <div className="hidden md:flex gap-2 text-slate-400">
+              <button onClick={() => slideGallery('left')} className="p-2 border border-slate-200 rounded-full hover:bg-slate-50"><ChevronLeft size={20}/></button>
+              <button onClick={() => slideGallery('right')} className="p-2 border border-slate-200 rounded-full hover:bg-slate-50"><ChevronRight size={20}/></button>
+            </div>
           </div>
           
-          {/* Changed to a single-column stack, capped at max-w-5xl so it looks cinematic but not overly stretched */}
+          <div className="flex md:grid md:grid-cols-4 gap-6 overflow-x-auto snap-x snap-mandatory custom-scrollbar pb-8 -mx-6 px-6 md:mx-0 md:px-0 relative z-10">
+            {signatureProducts.length > 0 ? (
+              signatureProducts.slice(0, visibleSignatureCount).map((item) => (
+                <ProductCard key={item.id} item={item} onSelect={handleSelectProduct} />
+              ))
+            ) : (
+              <div className="col-span-4 text-center text-slate-400 py-16 border border-dashed border-slate-200 rounded-sm">
+                Upload signature styles in the admin portal.
+              </div>
+            )}
+          </div>
+
+          {/* ADDED: The Load More Button for Signature Styles */}
+          {visibleSignatureCount < signatureProducts.length && (
+            <div className="mt-8 text-center relative z-10">
+              <button 
+                onClick={() => setVisibleSignatureCount(prev => prev + 4)} 
+                className="border border-slate-900 text-slate-900 px-10 py-4 uppercase tracking-widest text-sm font-medium hover:bg-slate-900 hover:text-white transition rounded-sm"
+              >
+                Load More Styles
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* DIVIDER: Signature to Founder */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[40px] md:h-[80px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M1200 120L0 16.48 0 0 1200 0 1200 120z" className="fill-[#FDFBF7]"></path>
+          </svg>
+        </div>
+      </section>
+
+      {/* 3. ABOUT / FOUNDER SECTION */}
+      <section id="founder" className="relative pt-24 pb-40 px-6 md:px-16 flex flex-col md:flex-row gap-16 md:gap-24 items-center bg-[#FDFBF7]">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-16 md:gap-24 items-center w-full">
+          <div className="w-full md:w-1/2 relative mt-8 md:mt-0 z-10">
+            <div className="absolute top-6 -left-6 w-full h-full border border-amber-700/20 rounded-sm hidden md:block"></div>
+            <div className="relative w-full aspect-[4/5] p-3 md:p-5 rounded-sm bg-white border border-slate-100 shadow-xl group">
+              <div className="relative w-full h-full overflow-hidden rounded-sm bg-slate-100">
+                <img 
+                  src="/founder.jpg" 
+                  alt="The Stylist" 
+                  className="w-full h-full object-cover transition-transform duration-[2s] ease-in-out group-hover:scale-110" 
+                  onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/800x1000/eeeeee/999999?text=Stylist+Image" }} 
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div className="w-full md:w-1/2 flex flex-col justify-center z-10 relative">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-[1px] bg-amber-700"></div>
+              <h2 className="text-xs font-medium tracking-widest text-amber-700 uppercase">The Visionary</h2>
+            </div>
+            
+            <h3 className="text-4xl md:text-6xl font-serif text-slate-900 leading-tight mb-8">Meet The Stylist.</h3>
+            
+            <div className="space-y-6 text-slate-600 text-base md:text-lg leading-relaxed font-light">
+              <p>
+                <span className="font-medium text-slate-900">LUXE & CO. is more than a salon or a boutique;</span> it is a sanctuary for crown care and premium accessories.
+              </p>
+              <p>
+                With years of mastering intricate braiding techniques and an impeccable eye for luxury accessories, we bridge the gap between traditional hair artistry and contemporary fashion. Every braid is protective, precise, and painless. Every handbag is hand-selected to elevate your presence.
+              </p>
+              
+              <div className="pt-6 mt-6">
+                <blockquote className="pl-6 border-l-2 border-amber-500 italic text-slate-800 font-serif text-xl md:text-2xl leading-relaxed">
+                  "Your hair is your crown, and your accessories are your armor. We ensure both are flawless."
+                </blockquote>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* DIVIDER: Founder to Collections */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[40px] md:h-[80px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M1200 120L0 16.48 0 0 1200 0 1200 120z" className="fill-white"></path>
+          </svg>
+        </div>
+      </section>
+
+      {/* 4. FULL COLLECTIONS (Database Table 2) */}
+      <section id="collections" className="relative pt-20 pb-40 px-6 md:px-16 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-end mb-12 relative z-10">
+            <div>
+              <h2 className="text-xs font-medium tracking-widest text-amber-700 uppercase mb-2">Luxury Accessories</h2>
+              <h2 className="text-3xl md:text-5xl font-serif text-slate-900">Handbags & More</h2>
+            </div>
+            <div className="hidden md:flex gap-2 text-slate-400">
+              <button onClick={() => slideGallery('left')} className="p-2 border border-slate-200 rounded-full hover:bg-slate-50"><ChevronLeft size={20}/></button>
+              <button onClick={() => slideGallery('right')} className="p-2 border border-slate-200 rounded-full hover:bg-slate-50"><ChevronRight size={20}/></button>
+            </div>
+          </div>
+          
+          <div className="flex md:grid md:grid-cols-4 gap-6 overflow-x-auto snap-x snap-mandatory custom-scrollbar pb-8 -mx-6 px-6 md:mx-0 md:px-0 relative z-10">
+            {products.length > 0 ? (
+              products.slice(0, visibleCount).map((item) => (
+                <ProductCard key={item.id} item={item} onSelect={handleSelectProduct} />
+              ))
+            ) : (
+              <div className="col-span-4 text-center text-slate-400 py-16 border border-dashed border-slate-200 rounded-sm">
+                Upload catalog products in the admin portal.
+              </div>
+            )}
+          </div>
+
+          {visibleCount < products.length && (
+            <div className="mt-8 text-center relative z-10">
+              <button 
+                onClick={() => setVisibleCount(prev => prev + 4)} 
+                className="border border-slate-900 text-slate-900 px-10 py-4 uppercase tracking-widest text-sm font-medium hover:bg-slate-900 hover:text-white transition rounded-sm"
+              >
+                Load More
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* DIVIDER: Collections to Transformations */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[60px] md:h-[120px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M985.66,92.83C906.67,72,823.78,31,743.84,14.19c-82.26-17.34-168.06-16.33-250.45.39-57.84,11.73-114,31.07-172,41.86A600.21,600.21,0,0,1,0,27.35V120H1200V95.8C1132.19,118.92,1055.71,111.31,985.66,92.83Z" className="fill-slate-900"></path>
+          </svg>
+        </div>
+      </section>
+
+      {/* 5. BEFORE & AFTER / TRANSFORMATIONS */}
+      <section id="transformations" className="relative pt-24 pb-48 px-6 md:px-16 bg-slate-900 text-white text-center">
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <h2 className="text-3xl md:text-5xl font-serif mb-4">THE TRANSFORMATION.</h2>
+          <p className="text-slate-400 mb-16 max-w-2xl mx-auto">Witness the precision and artistry of our premium protective styles.</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            {transformations.length > 0 ? transformations.slice(0, 2).map((item) => (
+              <div key={item.id} className="flex flex-col group cursor-pointer z-10">
+                 <div className="flex w-full aspect-[4/5] md:aspect-[4/3] rounded-sm overflow-hidden shadow-2xl mb-6 border border-slate-700 relative">
+                   <div className="w-1/2 relative border-r border-slate-800 overflow-hidden">
+                     <img src={item.before_image} alt="Before" className="w-full h-full object-cover grayscale-[50%] opacity-80 transition duration-[1.5s] group-hover:scale-105 group-hover:grayscale-0 group-hover:opacity-100" />
+                     <span className="absolute bottom-4 left-4 bg-black/80 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm backdrop-blur-sm">Before</span>
+                   </div>
+                   <div className="w-1/2 relative overflow-hidden bg-slate-800">
+                     <img src={item.after_image} alt="After" className="w-full h-full object-cover transition duration-[1.5s] group-hover:scale-105" />
+                     <span className="absolute bottom-4 right-4 bg-amber-700/90 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm backdrop-blur-sm shadow-lg text-white">After</span>
+                   </div>
+                 </div>
+                 <h4 className="text-2xl font-serif text-amber-500 group-hover:text-white transition">{item.title}</h4>
+              </div>
+            )) : (
+              <div className="col-span-2 text-slate-500 py-24 border border-dashed border-slate-700 rounded-sm tracking-widest text-sm uppercase z-10">Upload transformations in the admin portal.</div>
+            )}
+          </div>
+        </div>
+
+        {/* DIVIDER: Transformations to Lookbook */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[50px] md:h-[100px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V120H0Z" opacity=".25" className="fill-white"></path>
+            <path d="M0,0V15.81C13,36.92,27.64,56.86,47.69,72.05,99.41,111.27,165,111,224.58,91.58c31.15-10.15,60.09-26.07,89.67-39.8,40.92-19,84.73-46,130.83-49.67,36.26-2.85,70.9,9.42,98.6,31.56,31.77,25.39,62.32,62,103.63,73,40.44,10.79,81.35-6.69,119.13-24.28s75.16-39,116.92-43.05c59.73-5.85,113.28,22.88,168.9,38.84,30.2,8.66,59,6.17,87.09-7.5,22.43-10.89,48-26.93,60.65-49.24V120H0Z" opacity=".5" className="fill-white"></path>
+            <path d="M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V120H0Z" className="fill-white"></path>
+          </svg>
+        </div>
+      </section>
+
+      {/* 6. CLIENT LOOKBOOK (Gallery of Past Work) */}
+      <section id="lookbook" className="relative pt-24 pb-40 px-6 md:px-16 bg-white">
+        <div className="max-w-7xl mx-auto relative z-10">
+          <h2 className="text-3xl md:text-5xl font-serif mb-4 text-slate-900 text-center">Past Work</h2>
+          <p className="text-slate-500 mb-12 text-center max-w-xl mx-auto">See our craftsmanship in the real world.</p>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {gallery.slice(0, visibleGalleryCount).map((img, i) => (
+              <div key={img.id || i} className="relative group overflow-hidden rounded-sm aspect-[4/5] bg-slate-100">
+                <img src={img.image_url} alt="Client Lookbook" className="w-full h-full object-cover group-hover:scale-105 transition duration-700" />
+                
+                {/* MOBILE: Always visible at bottom. DESKTOP: Full overlay on hover. */}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end md:items-center justify-center pb-6 md:pb-0 backdrop-blur-[0px] md:group-hover:backdrop-blur-[2px]">
+                  <button 
+                    onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=Hi LUXE CO., I want to book/enquire about a style I saw in your Lookbook.`, '_blank')}
+                    className="bg-white text-slate-900 px-4 md:px-6 py-2.5 md:py-3 text-[9px] md:text-[10px] uppercase tracking-widest font-medium rounded-sm shadow-xl hover:bg-amber-50 transition transform translate-y-0 md:translate-y-4 group-hover:translate-y-0 duration-300"
+                  >
+                    Book This Look
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {visibleGalleryCount < gallery.length && (
+            <div className="mt-16 text-center">
+              <button 
+                onClick={() => setVisibleGalleryCount(prev => prev + 4)} 
+                className="border border-slate-900 text-slate-900 px-10 py-4 uppercase tracking-widest text-sm font-medium hover:bg-slate-900 hover:text-white transition rounded-sm"
+              >
+                Load More Styles
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* DIVIDER: Lookbook to Events */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[40px] md:h-[80px]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V120H0Z" className="fill-[#FDFBF7]"></path>
+          </svg>
+        </div>
+      </section>
+
+      {/* 7. EVENTS / POP-UPS SECTION */}
+      <section id="events" className="relative pt-24 pb-40 px-6 md:px-16 bg-[#FDFBF7]">
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-serif text-slate-900 mb-4">POP-UPS & MASTERCLASSES.</h2>
+            <p className="text-slate-500">Join our exclusive styling events and bag collection launches.</p>
+          </div>
+          
           <div className="flex flex-col gap-8 max-w-5xl mx-auto">
             {events.length > 0 ? (
               events.map((ev) => <EventCard key={ev.id} ev={ev} mounted={mounted} />)
             ) : (
-              <div className="text-center text-slate-500 py-24 border border-dashed border-slate-700 rounded-sm">
-                Stay tuned for upcoming events.
+              <div className="text-center text-slate-400 py-24 border border-dashed border-slate-200 rounded-sm">
+                Stay tuned for upcoming pop-up events.
               </div>
             )}
           </div>
         </div>
+
+        {/* DIVIDER: Events to Academy */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[40px] md:h-[80px]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+             <path d="M1200 120L0 16.48 0 0 1200 0 1200 120z" className="fill-[#F9F7F2]"></path>
+          </svg>
+        </div>
       </section>
 
-      {/* ACADEMY SECTION */}
-      <section id="academy" className="py-24 px-6 md:px-16 bg-[#F9F7F2]">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-16 items-center">
-          
-          {/* LEFT SIDE: Premium Visuals & Dynamic Details */}
+      {/* 8. ACADEMY SECTION */}
+      <section id="academy" className="relative pt-24 pb-40 px-6 md:px-16 bg-[#F9F7F2]">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-16 items-center relative z-10">
           <div className="w-full lg:w-1/2">
             <div className="flex items-center gap-4 mb-6">
               <BookOpen className="text-amber-700" size={24} />
-              <h2 className="text-xs font-medium tracking-widest text-amber-700 uppercase">Jupilo Academy</h2>
+              <h2 className="text-xs font-medium tracking-widest text-amber-700 uppercase">LUXE Academy</h2>
             </div>
-            <h3 className="text-4xl md:text-5xl font-serif text-slate-900 leading-tight mb-8">Master the Art of Couture.</h3>
+            <h3 className="text-4xl md:text-5xl font-serif text-slate-900 leading-tight mb-8">Master the Art of Braiding.</h3>
             
-            {/* Hardcoded Premium Image */}
             <div className="relative w-full aspect-video md:aspect-[4/3] rounded-sm overflow-hidden shadow-lg mb-8">
-              <img 
-                src="/academy.jpg" 
-                alt="Jupilo Fashion Academy" 
-                className="w-full h-full object-cover" 
-                onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/800x600/eeeeee/999999?text=Academy+Image" }} 
-              />
+              <img src="/academy.jpg" alt="Braiding Academy" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/800x600/eeeeee/999999?text=Academy+Image" }} />
             </div>
 
-            {/* Dynamic Course Details (Pulls the first course from DB) */}
             {academyCourses.length > 0 ? (
               <div className="bg-white p-6 md:p-8 rounded-sm shadow-sm border border-slate-100">
                 <h4 className="text-2xl font-serif text-slate-900 mb-3">{academyCourses[0].title}</h4>
@@ -484,17 +593,14 @@ export default function JupiloPublicSite() {
               </div>
             ) : (
               <div className="bg-white p-6 md:p-8 rounded-sm shadow-sm border border-slate-100">
-                <h4 className="text-2xl font-serif text-slate-900 mb-3">Masterclass Series</h4>
-                <p className="text-slate-600 mb-4 text-sm leading-relaxed">Join our next cohort to learn structural design, pattern drafting, and the business of high-end fashion.</p>
+                <h4 className="text-2xl font-serif text-slate-900 mb-3">Professional Braiding Masterclass</h4>
+                <p className="text-slate-600 mb-4 text-sm leading-relaxed">Join our next cohort to learn precision parting, painless gripping techniques, and the business of premium hair care.</p>
               </div>
             )}
           </div>
 
-          {/* RIGHT SIDE: The Application Form */}
           <div className="w-full lg:w-1/2 bg-white p-8 md:p-12 rounded-sm shadow-xl border border-slate-100 relative overflow-hidden">
-             {/* Decorative subtle background corner */}
              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50/50 rounded-bl-full -z-0"></div>
-             
              <div className="relative z-10">
                <h4 className="text-3xl font-serif text-slate-900 mb-2">Secure Your Seat</h4>
                <p className="text-slate-500 text-sm mb-8">Spaces are strictly limited to ensure personalized mentorship.</p>
@@ -526,9 +632,9 @@ export default function JupiloPublicSite() {
                     <div>
                       <label className="block text-[10px] font-medium mb-2 uppercase tracking-widest text-slate-500">Experience Level</label>
                       <select value={academyForm.experience} onChange={(e) => setAcademyForm({...academyForm, experience: e.target.value})} className="w-full border-b border-slate-300 px-0 py-2 bg-transparent focus:border-amber-700 outline-none transition rounded-none text-slate-700 pb-2 cursor-pointer">
-                        <option value="Beginner">Beginner (No prior experience)</option>
-                        <option value="Intermediate">Intermediate (Knows basic sewing)</option>
-                        <option value="Advanced">Advanced (Looking to scale/refine)</option>
+                        <option value="Beginner">Beginner (No prior braiding experience)</option>
+                        <option value="Intermediate">Intermediate (Knows basic styles)</option>
+                        <option value="Advanced">Advanced (Looking to refine speed/technique)</option>
                       </select>
                     </div>
 
@@ -540,152 +646,37 @@ export default function JupiloPublicSite() {
              </div>
           </div>
         </div>
-      </section>
 
-      {/* GALLERY */}
-      <section className="py-24 px-6 md:px-16 max-w-7xl mx-auto">
-        <h2 className="text-3xl md:text-5xl font-serif mb-12 text-slate-900 text-center">Inside Jupilo</h2>
-        
-        {/* Masonry Grid (2 columns on mobile, 4 on desktop) */}
-        <div className="columns-2 md:columns-4 gap-4 space-y-4">
-          {gallery.slice(0, visibleGalleryCount).map((img, i) => (
-            <div key={img.id || i} className="break-inside-avoid relative group cursor-pointer overflow-hidden rounded-sm mb-4">
-              <img src={img.image_url} alt="Gallery image" className="w-full object-cover group-hover:scale-105 transition duration-700" />
-            </div>
-          ))}
-        </div>
-
-        {/* LOAD MORE BUTTON */}
-        {visibleGalleryCount < gallery.length && (
-          <div className="mt-16 text-center">
-            <button 
-              onClick={() => setVisibleGalleryCount(prev => prev + 4)} 
-              className="border border-slate-900 text-slate-900 px-10 py-4 uppercase tracking-widest text-sm font-medium hover:bg-slate-900 hover:text-white transition rounded-sm"
-            >
-              Load More Photos
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* BEFORE & AFTER */}
-      <section className="py-24 px-6 md:px-16 bg-slate-900 text-white text-center">
-        <h2 className="text-3xl md:text-5xl font-serif mb-4">FROM VISION TO FINISH.</h2>
-        <p className="text-slate-400 mb-16 max-w-2xl mx-auto">Watch how raw fabric and sketches transform into structural masterpieces.</p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-7xl mx-auto">
-          {transformations.length > 0 ? transformations.slice(0, 2).map((item) => (
-            <div key={item.id} className="flex flex-col group cursor-pointer">
-               {/* 50/50 Image Container */}
-               <div className="flex w-full aspect-[4/3] rounded-sm overflow-hidden shadow-2xl mb-6 border border-slate-700 relative">
-                  
-                  {/* Before Side: Slightly desaturated until hovered for cinematic effect */}
-                  <div className="w-1/2 relative border-r border-slate-800 overflow-hidden">
-                    <img src={item.before_image} alt="Before" className="w-full h-full object-cover grayscale-[50%] opacity-80 transition duration-[1.5s] group-hover:scale-105 group-hover:grayscale-0 group-hover:opacity-100" />
-                    <span className="absolute bottom-4 left-4 bg-black/80 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm backdrop-blur-sm">Before</span>
-                  </div>
-                  
-                  {/* After Side */}
-                  <div className="w-1/2 relative overflow-hidden bg-slate-800">
-                    <img src={item.after_image} alt="After" className="w-full h-full object-cover transition duration-[1.5s] group-hover:scale-105" />
-                    <span className="absolute bottom-4 right-4 bg-amber-700/90 px-3 py-1 text-[10px] uppercase tracking-widest rounded-sm backdrop-blur-sm shadow-lg text-white">After</span>
-                  </div>
-               </div>
-               
-               <h4 className="text-2xl font-serif text-amber-500 group-hover:text-white transition">{item.title}</h4>
-            </div>
-          )) : (
-            <div className="col-span-2 text-slate-500 py-24 border border-dashed border-slate-700 rounded-sm tracking-widest text-sm uppercase">Upload transformations in the admin portal.</div>
-          )}
+        {/* DIVIDER: Academy to FAQ */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[50px] md:h-[80px]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118,137.9,114,207.2,104.9,245.8,99.8,284.1,89.5,321.39,56.44Z" className="fill-white"></path>
+          </svg>
         </div>
       </section>
 
-      {/* CONTACT */}
-      <section id="contact" className="py-24 px-6 md:px-16 bg-[#F9F7F2] border-t border-slate-200">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-16">
-          <div className="w-full md:w-1/2">
-            <h3 className="text-4xl md:text-5xl font-serif text-slate-900 leading-tight mb-6">Let's create something extraordinary.</h3>
-          </div>
-          <div className="w-full md:w-1/2 bg-white p-8 rounded-sm shadow-xl border border-slate-100">
-            {submitSuccess ? (
-              <div className="text-center py-12"><CheckCircle className="text-green-500 mx-auto mb-4" size={48} /><h4 className="text-2xl font-serif">Message Sent</h4></div>
-            ) : (
-              <form onSubmit={handleContactSubmit} className="space-y-6">
-                <input required type="text" value={contactForm.name} onChange={(e) => setContactForm({...contactForm, name: e.target.value})} className="w-full border px-4 py-3 bg-slate-50 rounded-sm" placeholder="Full Name" />
-                <input required type="text" value={contactForm.contact} onChange={(e) => setContactForm({...contactForm, contact: e.target.value})} className="w-full border px-4 py-3 bg-slate-50 rounded-sm" placeholder="Email or Phone" />
-                <textarea required rows={4} value={contactForm.message} onChange={(e) => setContactForm({...contactForm, message: e.target.value})} className="w-full border px-4 py-3 bg-slate-50 rounded-sm" placeholder="How can we help?" />
-                <button type="submit" disabled={isSubmitting} className="w-full bg-slate-900 text-white py-4 uppercase tracking-widest text-sm">{isSubmitting ? 'Sending...' : 'Send Message'}</button>
-              </form>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* TESTIMONIALS */}
-      <section className="py-24 px-6 md:px-16 bg-[#F9F7F2]">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col items-center text-center mb-16">
-            <h2 className="text-xs font-medium tracking-widest text-amber-700 uppercase mb-4">The Jupilo Experience</h2>
-            <h3 className="text-3xl md:text-5xl font-serif text-slate-900">Word of Mouth.</h3>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                quote: "Jupilo doesn't just make clothes; they architect confidence. My bespoke suit was the undisputed highlight of the gala.",
-                name: "Elena R.",
-                role: "Bespoke Client"
-              },
-              {
-                quote: "The Academy completely shifted my understanding of garment structure. A true masterclass in contemporary couture.",
-                name: "Sarah M.",
-                role: "Academy Alumna"
-              },
-              {
-                quote: "Unapologetic elegance. The attention to detail in the ready-to-wear collection rivals top-tier European luxury houses.",
-                name: "Aisha T.",
-                role: "Ready-To-Wear"
-              }
-            ].map((testimonial, i) => (
-              <div key={i} className="bg-white p-8 md:p-10 rounded-sm shadow-sm border border-slate-100 flex flex-col justify-between">
-                <div>
-                  <div className="flex gap-1 text-amber-500 mb-6">
-                    ★★★★★
-                  </div>
-                  <p className="text-slate-600 font-light leading-relaxed mb-8">"{testimonial.quote}"</p>
-                </div>
-                <div>
-                  <h4 className="font-serif text-slate-900 text-lg">{testimonial.name}</h4>
-                  <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">{testimonial.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-     {/* FAQ SECTION (Premium Accordion) */}
-      <section className="py-24 px-6 md:px-16 bg-white">
-        <div className="max-w-3xl mx-auto">
+      {/* 9. FAQ SECTION */}
+      <section className="relative pt-24 pb-40 px-6 md:px-16 bg-white">
+        <div className="max-w-3xl mx-auto relative z-10">
           <h3 className="text-3xl md:text-4xl font-serif text-slate-900 text-center mb-16">Frequently Asked.</h3>
           
           <div className="border-t border-slate-200">
             {[
               {
-                question: "How do I book a bespoke fitting?",
-                answer: "Bespoke consultations are strictly by appointment. You can initiate a request via our Contact form or directly through our WhatsApp concierge."
+                question: "How do I book a hair appointment?",
+                answer: "Appointments are strictly by booking. You can initiate a request via our Contact form below or message our WhatsApp concierge directly with your desired style."
               },
               {
-                question: "Do you ship internationally?",
-                answer: "Yes, Jupilo caters to a global clientele. International shipping timelines vary based on the specific garment and destination."
+                question: "Do you ship handbags internationally?",
+                answer: "Yes, we cater to a global clientele. Handbag shipping timelines vary based on the specific piece and your destination."
               },
               {
-                question: "What are the Academy prerequisites?",
-                answer: "We welcome both passionate beginners and intermediate tailors. The only prerequisite is a relentless dedication to the craft of structural fashion."
+                question: "Is hair included in the braiding service?",
+                answer: "Yes, premium extensions are included in most of our braiding packages to ensure the color match and texture meet our luxury standards. Please specify your color when booking."
               },
               {
-                question: "How long does a custom piece take?",
-                answer: "Bespoke creations typically require 4 to 6 weeks, accommodating multiple rigorous fittings to ensure absolute structural perfection."
+                question: "How long do the braids typically last?",
+                answer: "With our specialized techniques and proper at-home maintenance, our protective styles remain neat and secure for 4 to 6 weeks without causing tension to your edges."
               }
             ].map((faq, index) => (
               <div key={index} className="border-b border-slate-200">
@@ -701,11 +692,7 @@ export default function JupiloPublicSite() {
                   </span>
                 </button>
                 
-                <div 
-                  className={`overflow-hidden transition-all duration-500 ease-in-out ${
-                    openFaq === index ? 'max-h-40 opacity-100 pb-6' : 'max-h-0 opacity-0'
-                  }`}
-                >
+                <div className={`overflow-hidden transition-all duration-500 ease-in-out ${openFaq === index ? 'max-h-40 opacity-100 pb-6' : 'max-h-0 opacity-0'}`}>
                   <p className="text-slate-600 font-light text-sm leading-relaxed pr-8 md:pr-12">
                     {faq.answer}
                   </p>
@@ -714,25 +701,61 @@ export default function JupiloPublicSite() {
             ))}
           </div>
         </div>
+
+        {/* DIVIDER: FAQ to Contact */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[40px] md:h-[80px]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V120H0Z" className="fill-[#F9F7F2]"></path>
+          </svg>
+        </div>
+      </section>
+
+      {/* 10. CONTACT */}
+      <section id="contact" className="relative pt-24 pb-48 px-6 md:px-16 bg-[#F9F7F2]">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-16 relative z-10">
+          <div className="w-full md:w-1/2">
+            <h3 className="text-4xl md:text-5xl font-serif text-slate-900 leading-tight mb-6">Let's craft your look.</h3>
+            <p className="text-slate-600 mb-8">Reach out to book an appointment, reserve a handbag, or inquire about masterclasses.</p>
+          </div>
+          <div className="w-full md:w-1/2 bg-white p-8 rounded-sm shadow-xl border border-slate-100">
+            {submitSuccess ? (
+              <div className="text-center py-12"><CheckCircle className="text-green-500 mx-auto mb-4" size={48} /><h4 className="text-2xl font-serif">Message Sent</h4></div>
+            ) : (
+              <form onSubmit={handleContactSubmit} className="space-y-6">
+                <input required type="text" value={contactForm.name} onChange={(e) => setContactForm({...contactForm, name: e.target.value})} className="w-full border px-4 py-3 bg-slate-50 rounded-sm" placeholder="Full Name" />
+                <input required type="text" value={contactForm.contact} onChange={(e) => setContactForm({...contactForm, contact: e.target.value})} className="w-full border px-4 py-3 bg-slate-50 rounded-sm" placeholder="Email or Phone" />
+                <textarea required rows={4} value={contactForm.message} onChange={(e) => setContactForm({...contactForm, message: e.target.value})} className="w-full border px-4 py-3 bg-slate-50 rounded-sm" placeholder="How can we help?" />
+                <button type="submit" disabled={isSubmitting} className="w-full bg-slate-900 text-white py-4 uppercase tracking-widest text-sm hover:bg-amber-700 transition">{isSubmitting ? 'Sending...' : 'Send Message'}</button>
+              </form>
+            )}
+          </div>
+        </div>
+
+        {/* DIVIDER: Contact to Footer (Deep Sweeping Wave) */}
+        <div className="absolute bottom-[-1px] left-0 w-full overflow-hidden leading-[0]">
+          <svg className="relative block w-full h-[60px] md:h-[150px]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path d="M985.66,92.83C906.67,72,823.78,31,743.84,14.19c-82.26-17.34-168.06-16.33-250.45.39-57.84,11.73-114,31.07-172,41.86A600.21,600.21,0,0,1,0,27.35V120H1200V95.8C1132.19,118.92,1055.71,111.31,985.66,92.83Z" className="fill-slate-900"></path>
+          </svg>
+        </div>
       </section>
       
-      {/* FOOTER */}
-      <footer className="bg-slate-900 text-white pt-20 pb-10 px-6 md:px-16">
+      {/* 11. FOOTER */}
+      <footer className="bg-slate-900 text-white pt-10 pb-10 px-6 md:px-16">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 border-b border-slate-800 pb-16 mb-10">
           <div className="md:col-span-2">
-            <div className="text-3xl font-serif font-bold tracking-widest mb-6">JUPILO.</div>
+            <div className="text-3xl font-serif font-bold tracking-widest mb-6">LUXE & CO.</div>
             <p className="text-slate-400 font-light max-w-sm leading-relaxed">
-              Contemporary fashion, thoughtfully designed and meticulously crafted for women who want to stand out.
+              Flawless braiding, premium hair care, and meticulously curated luxury handbags for the unapologetic woman.
             </p>
           </div>
           
           <div>
             <h4 className="text-xs font-medium tracking-widest uppercase text-slate-500 mb-6">Explore</h4>
             <ul className="space-y-4 text-sm font-light text-slate-300">
-              <li><a href="#collections" className="hover:text-amber-500 transition">Collections</a></li>
-              <li><a href="#events" className="hover:text-amber-500 transition">Runway & Events</a></li>
+              <li><a href="#signature" className="hover:text-amber-500 transition">Signature</a></li>
+              <li><a href="#collections" className="hover:text-amber-500 transition">Full Catalog</a></li>
+              <li><a href="#lookbook" className="hover:text-amber-500 transition">Client Lookbook</a></li>
               <li><a href="#academy" className="hover:text-amber-500 transition">The Academy</a></li>
-              <li><a href="#founder" className="hover:text-amber-500 transition">The Designer</a></li>
             </ul>
           </div>
 
@@ -740,16 +763,15 @@ export default function JupiloPublicSite() {
             <h4 className="text-xs font-medium tracking-widest uppercase text-slate-500 mb-6">Connect</h4>
             <ul className="space-y-4 text-sm font-light text-slate-300">
               <li><a href="#" className="hover:text-amber-500 transition">Instagram</a></li>
-              <li><a href="#" className="hover:text-amber-500 transition">Twitter (X)</a></li>
+              <li><a href="#" className="hover:text-amber-500 transition">TikTok</a></li>
               <li><a href="#" className="hover:text-amber-500 transition">WhatsApp Concierge</a></li>
             </ul>
           </div>
         </div>
         
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-[10px] uppercase tracking-widest text-slate-500">
-          <p>© {new Date().getFullYear()} JUPILO FASHION. ALL RIGHTS RESERVED.</p>
+          <p>© {new Date().getFullYear()} LUXE HAIR & BAGS. ALL RIGHTS RESERVED.</p>
           
-          {/* SECRET ADMIN DOOR - Boosted z-index to ensure it is clickable */}
           <p className="mt-4 md:mt-0 text-slate-600 relative z-50">
             CRAFTED BY{' '}
             <a href="/admin" className="hover:text-amber-500 transition duration-500 cursor-pointer font-bold">
