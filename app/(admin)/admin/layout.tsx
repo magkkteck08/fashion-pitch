@@ -1,11 +1,15 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, MessageSquare, ShoppingBag, Star, Truck, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { 
+  LayoutDashboard, Package, MessageSquare, ShoppingBag, 
+  Star, Truck, ShieldCheck, ArrowLeft, Menu, X 
+} from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const navItems = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -18,15 +22,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ];
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      {/* Sidebar */}
-      <div className="w-64 bg-[#0B1120] text-slate-300 flex flex-col justify-between">
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans w-full">
+      
+      {/* MOBILE OVERLAY */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* SIDEBAR */}
+      <div 
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0B1120] text-slate-300 flex flex-col justify-between transform transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
         <div>
-          <div className="p-6">
-            <h1 className="text-xl font-serif font-bold text-white tracking-widest">LUXE ADMIN</h1>
-            <p className="text-[9px] uppercase tracking-widest text-slate-500 mt-1">Management Portal</p>
+          <div className="p-6 flex justify-between items-center">
+            <div>
+              <h1 className="text-xl font-serif font-bold text-white tracking-widest">LUXE ADMIN</h1>
+              <p className="text-[9px] uppercase tracking-widest text-slate-500 mt-1">Management Portal</p>
+            </div>
+            <button className="md:hidden text-slate-400 hover:text-white" onClick={() => setIsSidebarOpen(false)}>
+              <X size={20} />
+            </button>
           </div>
-          <nav className="mt-6 flex flex-col gap-1 px-4">
+          <nav className="mt-2 flex flex-col gap-1 px-4">
             {navItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
@@ -34,6 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Link
                   key={item.name}
                   href={item.href}
+                  onClick={() => setIsSidebarOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-bold uppercase tracking-widest transition ${
                     isActive ? 'bg-amber-700 text-white' : 'hover:bg-slate-800 hover:text-white'
                   }`}
@@ -46,18 +69,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </nav>
         </div>
         
-        {/* Footer Link */}
         <div className="p-4 border-t border-slate-800">
           <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-md text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white hover:bg-slate-800 transition">
-            <ArrowLeft size={16} />
-            Back to Store
+            <ArrowLeft size={16} /> Back to Store
           </Link>
         </div>
       </div>
 
-      {/* Main Content Viewport */}
-      <div className="flex-1 overflow-y-auto">
-        {children}
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 flex flex-col overflow-hidden w-full">
+        <div className="md:hidden bg-[#0B1120] p-4 flex items-center gap-4 text-white shrink-0">
+          <button onClick={() => setIsSidebarOpen(true)} className="text-slate-300 hover:text-white">
+            <Menu size={24} />
+          </button>
+          <h1 className="text-sm font-serif font-bold tracking-widest uppercase">Luxe Admin</h1>
+        </div>
+        <div className="flex-1 overflow-y-auto w-full custom-scrollbar">
+          {children}
+        </div>
       </div>
     </div>
   );
