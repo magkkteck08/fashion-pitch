@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-// IMPORTANT: Update this import path to match exactly where your chat component is located
-import ChatWidget from "@/components/ChatWidget"; 
+// Corrected import based on your file tree
+import LiveChat from "@/components/LiveChat"; 
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,7 +23,7 @@ export default function RootLayout({
         {children}
         
         {/* Restored Global Chat Box */}
-        <ChatWidget />
+        <LiveChat />
       </body>
     </html>
   );
