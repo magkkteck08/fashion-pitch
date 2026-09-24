@@ -86,7 +86,7 @@ export default function LuxePublicSite() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  const [orderSuccess, setOrderSuccess] = useState(false);
+  const [successOrder, setSuccessOrder] = useState<{ trackingCode: string } | null>(null);
   const [orderTrackingNumber, setOrderTrackingNumber] = useState('');
   
   const [checkoutForm, setCheckoutForm] = useState({ name: '', email: '', phone: '', address: '' });
@@ -220,15 +220,16 @@ export default function LuxePublicSite() {
       const data = await response.json();
       console.log("SERVER API RESPONSE:", data); // Lets us see the exact response in Chrome DevTools
 
-      if (data.success) {
+      if (response.ok && data.success) {
+        // 1. Clear the cart data
         setCart([]);
         localStorage.removeItem('luxe_cart');
-        alert(`Order Successful! Your tracking code is: ${data.trackingCode}`);
-        window.location.href = '/track'; 
-      } else {
-        // We changed the wording here. If it fails now, it will say "NEW Error:"
-        alert(`NEW Error: ${data.error || 'Server did not provide an error message'}`);
-        setIsSubmittingOrder(false);
+        
+        // 2. Fire signal to Admin Tab
+        localStorage.setItem('luxe_new_order_signal', Date.now().toString());
+        
+        // 3. TRIGGER CUSTOM LUXURY MODAL INSTEAD OF ALERT
+        setSuccessOrder({ trackingCode: data.trackingCode });
       }
     } catch (err) {
       console.error(err);
@@ -646,6 +647,49 @@ export default function LuxePublicSite() {
           <p className="text-slate-600">CRAFTED BY <a href="/admin" className="hover:text-amber-500 transition font-bold">GUV'NOR MAGKK.</a></p>
         </div>
       </footer>
+      {/* LUXURY SUCCESS MODAL */}
+      {successOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Blurred dark backdrop */}
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"></div>
+          
+          {/* Modal Card */}
+          <div className="relative bg-white w-full max-w-md rounded-none shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
+            {/* Top Accent Bar */}
+            <div className="h-1.5 w-full bg-amber-700"></div>
+            
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Package size={32} className="text-amber-700" />
+              </div>
+              
+              <h2 className="text-3xl font-serif text-slate-900 mb-2">Order Secured.</h2>
+              <p className="text-sm text-slate-500 mb-8">
+                Your luxury items are being prepared. You will receive an email confirmation shortly.
+              </p>
+              
+              <div className="bg-slate-50 border border-slate-100 p-4 mb-8">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+                  Official Tracking Code
+                </p>
+                <p className="text-xl font-mono font-bold text-slate-900 tracking-wider">
+                  {successOrder.trackingCode}
+                </p>
+              </div>
+              
+              <button
+                onClick={() => {
+                  setSuccessOrder(null);
+                  window.location.href = '/track'; // Proceed to tracking
+                }}
+                className="w-full bg-[#0B1120] text-white text-xs font-bold uppercase tracking-widest py-4 hover:bg-amber-700 transition-colors duration-300 flex justify-center items-center gap-2"
+              >
+                Track My Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
