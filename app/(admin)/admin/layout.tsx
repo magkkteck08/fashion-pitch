@@ -1,70 +1,64 @@
-"use client";
-import { useState } from 'react';
+'use client';
+import React from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, ShoppingBag, Star, Image as ImageIcon, MessageSquare, LogOut, Menu, X } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { LayoutDashboard, Package, MessageSquare, ShoppingBag, Star, Truck, ShieldCheck, ArrowLeft } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const closeMenu = () => setIsMobileOpen(false);
+  const pathname = usePathname();
 
-  const handleSignOut = () => {
-    if (!confirm("Are you sure you want to sign out?")) return;
-    document.cookie = "admin_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    localStorage.removeItem('admin_auth');
-    localStorage.clear(); 
-    window.location.href = '/'; 
-  };
+  const navItems = [
+    { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { name: 'Orders', href: '/admin/orders', icon: Package },
+    { name: 'Live Chat', href: '/admin/chat', icon: MessageSquare },
+    { name: 'Main Catalog', href: '/admin/products', icon: ShoppingBag },
+    { name: 'Premium Line', href: '/admin/signature', icon: Star },
+    { name: 'Delivery Zones', href: '/admin/delivery', icon: Truck },
+    { name: 'Brand Vendors', href: '/admin/vendors', icon: ShieldCheck },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] flex font-sans">
-      
-      {/* MOBILE TOP NAVIGATION BAR */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 text-white flex items-center justify-between px-6 z-50 border-b border-slate-800">
-        <div className="text-xl font-serif font-bold tracking-widest">LUXE & CO.</div>
-        <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="text-white hover:text-amber-500 transition">
-          {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
-
-      {/* MOBILE DARK OVERLAY */}
-      {isMobileOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={closeMenu} />
-      )}
-
-      {/* SIDEBAR - CLEANED FOR E-COMMERCE */}
-      <aside className={`
-        fixed top-0 left-0 h-full w-64 bg-slate-900 text-white flex flex-col z-50 transition-transform duration-300 ease-in-out
-        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} 
-        md:translate-x-0 md:flex
-      `}>
-        <div className="p-6 border-b border-slate-800 hidden md:block">
-          <div className="text-2xl font-serif font-bold tracking-widest">LUXE & CO.</div>
-          <p className="text-xs text-amber-500 uppercase tracking-widest mt-1">Admin Portal</p>
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
+      {/* Sidebar */}
+      <div className="w-64 bg-[#0B1120] text-slate-300 flex flex-col justify-between">
+        <div>
+          <div className="p-6">
+            <h1 className="text-xl font-serif font-bold text-white tracking-widest">LUXE ADMIN</h1>
+            <p className="text-[9px] uppercase tracking-widest text-slate-500 mt-1">Management Portal</p>
+          </div>
+          <nav className="mt-6 flex flex-col gap-1 px-4">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-md text-xs font-bold uppercase tracking-widest transition ${
+                    isActive ? 'bg-amber-700 text-white' : 'hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Icon size={16} />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
         
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar mt-16 md:mt-0">
-          <Link onClick={closeMenu} href="/admin" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-sm transition">
-            <LayoutDashboard size={20} /> Dashboard
-          </Link>
-          <Link onClick={closeMenu} href="/admin/signature" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-sm transition">
-            <Star size={20} /> Premium Collection
-          </Link>
-          <Link onClick={closeMenu} href="/admin/products" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-sm transition">
-            <ShoppingBag size={20} /> Main Catalog
-          </Link>
-        </nav>
-
+        {/* Footer Link */}
         <div className="p-4 border-t border-slate-800">
-          <button onClick={handleSignOut} className="flex items-center gap-3 px-4 py-3 w-full text-left text-slate-400 hover:text-white hover:text-red-400 transition">
-            <LogOut size={20} /> Sign Out
-          </button>
+          <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-md text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white hover:bg-slate-800 transition">
+            <ArrowLeft size={16} />
+            Back to Store
+          </Link>
         </div>
-      </aside>
+      </div>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 pt-24 md:pt-8 overflow-y-auto w-full text-slate-900">
+      {/* Main Content Viewport */}
+      <div className="flex-1 overflow-y-auto">
         {children}
-      </main>
+      </div>
     </div>
   );
 }

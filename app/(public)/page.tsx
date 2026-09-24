@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, X, ImageIcon, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { Menu, X, ImageIcon, ChevronLeft, ChevronRight, Star, ShoppingCart, Trash2, CheckCircle, Plus, Minus } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 const parseSupabaseArray = (data: any) => {
@@ -17,24 +17,17 @@ const parseSupabaseArray = (data: any) => {
   return [];
 };
 
-// LIGHTWEIGHT MARKDOWN PARSER FOR DESCRIPTIONS
 const FormattedDescription = ({ text }: { text: string }) => {
   if (!text) return null;
-  
   return (
     <div className="text-slate-600 text-sm leading-relaxed space-y-3">
       {text.split('\n').map((line, i) => {
-        if (line.trim().startsWith('- ')) {
-          return <li key={i} className="ml-4 list-disc marker:text-amber-500 pl-1">{line.substring(2)}</li>;
-        }
-        
+        if (line.trim().startsWith('- ')) return <li key={i} className="ml-4 list-disc marker:text-amber-500 pl-1">{line.substring(2)}</li>;
         const parts = line.split(/(\*\*.*?\*\*)/g);
         return (
           <p key={i}>
             {parts.map((part, j) => 
-              part.startsWith('**') && part.endsWith('**') 
-                ? <strong key={j} className="font-bold text-slate-900">{part.slice(2, -2)}</strong> 
-                : part
+              part.startsWith('**') && part.endsWith('**') ? <strong key={j} className="font-bold text-slate-900">{part.slice(2, -2)}</strong> : part
             )}
           </p>
         );
@@ -68,14 +61,19 @@ const ProductCard = ({ item, onSelect }: { item: any, onSelect: (item: any) => v
 };
 
 export default function LuxePublicSite() {
-  const WHATSAPP_NUMBER = "2349073754047";
   const supabase = createClient();
   
   const [products, setProducts] = useState<any[]>([]);
   const [premiumProducts, setPremiumProducts] = useState<any[]>([]);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [deliveryOptions, setDeliveryOptions] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<any[]>([]); 
+  
   const [activeFilter, setActiveFilter] = useState('All');
-
+  const filters = ['All', 'Bags', 'Shoes', 'Palm Wears', 'Cloth', 'Men', 'Women'];
+  const [visibleMain, setVisibleMain] = useState(10);
+  const [visiblePremium, setVisiblePremium] = useState(10);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [productImages, setProductImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -83,18 +81,42 @@ export default function LuxePublicSite() {
   const [selectedSize, setSelectedSize] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const filters = ['All', 'Bags', 'Shoes', 'Palm Wears', 'Cloth', 'Men', 'Women'];
+  const [cart, setCart] = useState<any[]>([]);
+  const [isCartLoaded, setIsCartLoaded] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(false);
+  const [orderTrackingNumber, setOrderTrackingNumber] = useState('');
+  
+  const [checkoutForm, setCheckoutForm] = useState({ name: '', email: '', phone: '', address: '' });
+  const [selectedDelivery, setSelectedDelivery] = useState<any | null>(null);
 
   useEffect(() => {
     async function loadData() {
       const { data: prodData } = await supabase.from('products').select('*').limit(40);
       const { data: premiumData } = await supabase.from('signature_products' as any).select('*').limit(40);
+      const { data: delData } = await supabase.from('delivery_options').select('*').order('fee', { ascending: true });
+      const { data: vendorData } = await supabase.from('verified_vendors').select('*').eq('status', 'active'); 
       
-      if (prodData) setProducts(prodData);
-      if (premiumData) setPremiumProducts(premiumData);
+      if (prodData) setProducts(prodData.map(p => ({ ...p, tableType: 'products' })));
+      if (premiumData) setPremiumProducts(premiumData.map(p => ({ ...p, tableType: 'signature_products' })));
+      if (delData && delData.length > 0) {
+        setDeliveryOptions(delData);
+        setSelectedDelivery(delData[0]); 
+      }
+      if (vendorData) setVendors(vendorData); 
     }
     loadData();
+
+    const savedCart = localStorage.getItem('luxe_cart');
+    if (savedCart) setCart(JSON.parse(savedCart));
+    setIsCartLoaded(true);
   }, [supabase]);
+
+  useEffect(() => {
+    if (isCartLoaded) localStorage.setItem('luxe_cart', JSON.stringify(cart));
+  }, [cart, isCartLoaded]);
 
   const filteredProducts = activeFilter === 'All' 
     ? products 
@@ -110,65 +132,265 @@ export default function LuxePublicSite() {
     const extraImages = parseSupabaseArray(item.additional_images);
     setProductImages([item.image_url, ...extraImages].filter(Boolean));
     setCurrentImageIndex(0);
-    
     const availableColors = parseSupabaseArray(item.colors);
     const availableSizes = parseSupabaseArray(item.sizes);
     setSelectedColor(availableColors.length > 0 ? availableColors[0] : 'Standard');
     setSelectedSize(availableSizes.length > 0 ? availableSizes[0] : 'OS');
-    
     setSelectedProduct(item);
   };
 
-  const handleModalScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const scrollLeft = e.currentTarget.scrollLeft;
-    const width = e.currentTarget.clientWidth;
-    setCurrentImageIndex(Math.round(scrollLeft / width));
+  const addToCart = () => {
+    if (!selectedProduct) return;
+    const cartId = `${selectedProduct.id}-${selectedColor}-${selectedSize}`;
+    const existingItem = cart.find(c => c.cartId === cartId);
+    
+    if (existingItem) {
+      // Prevent adding more than available stock
+      if (existingItem.quantity + 1 > selectedProduct.stock_count) {
+        alert(`Cannot add more. Only ${selectedProduct.stock_count} available in stock.`);
+        return;
+      }
+      setCart(cart.map(c => c.cartId === cartId ? { ...c, quantity: c.quantity + 1 } : c));
+    } else {
+      // Ensure we don't add out of stock items
+      if (selectedProduct.stock_count < 1) {
+        alert("This item is currently out of stock.");
+        return;
+      }
+      setCart([...cart, { 
+        cartId,
+        product_id: selectedProduct.id, 
+        name: selectedProduct.name, 
+        price: selectedProduct.price, 
+        image: selectedProduct.image_url, 
+        color: selectedColor, 
+        size: selectedSize, 
+        quantity: 1,
+        tableType: selectedProduct.tableType,
+        maxStock: selectedProduct.stock_count // Save the max stock limit in the cart item
+      }]);
+    }
+    setSelectedProduct(null);
+    setIsCartOpen(true);
   };
 
-  const slideGallery = (direction: 'left' | 'right') => {
-    if (scrollRef.current) {
-      const { clientWidth } = scrollRef.current;
-      const scrollAmount = direction === 'left' ? -clientWidth : clientWidth;
-      scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  const removeFromCart = (cartId: string) => setCart(cart.filter(c => c.cartId !== cartId));
+  
+  const updateQuantity = (cartId: string, amount: number) => {
+    setCart(cart.map(c => {
+      if (c.cartId === cartId) {
+        const newQty = c.quantity + amount;
+        
+        // Prevent increasing quantity beyond available stock
+        if (newQty > c.maxStock) {
+          alert(`Maximum stock reached. Only ${c.maxStock} available.`);
+          return c;
+        }
+        
+        return newQty > 0 ? { ...c, quantity: newQty } : c;
+      }
+      return c;
+    }));
+  };
+
+  
+  const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const deliveryFee = selectedDelivery ? Number(selectedDelivery.fee) : 0;
+  const grandTotal = cartTotal + deliveryFee;
+
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0 || !selectedDelivery) return;
+    setIsSubmittingOrder(true);
+
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: checkoutForm.name,
+          email: checkoutForm.email,
+          phone: checkoutForm.phone,
+          deliveryAddress: checkoutForm.address,
+          items: cart,
+          totalAmount: grandTotal
+        })
+      });
+
+      const data = await response.json();
+      console.log("SERVER API RESPONSE:", data); // Lets us see the exact response in Chrome DevTools
+
+      if (data.success) {
+        setCart([]);
+        localStorage.removeItem('luxe_cart');
+        alert(`Order Successful! Your tracking code is: ${data.trackingCode}`);
+        window.location.href = '/track'; 
+      } else {
+        // We changed the wording here. If it fails now, it will say "NEW Error:"
+        alert(`NEW Error: ${data.error || 'Server did not provide an error message'}`);
+        setIsSubmittingOrder(false);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong processing your order.");
+      setIsSubmittingOrder(false);
     }
   };
 
-  // WhatsApp Order Formatter
-  const handleCheckout = () => {
-    if (!selectedProduct) return;
-    const message = `Hello LUXE & CO., I would like to place an order for:%0A%0A*Item:* ${selectedProduct.name}%0A*Color:* ${selectedColor}%0A*Size:* ${selectedSize}%0A*Price:* ₦${selectedProduct.price?.toLocaleString()}%0A%0APlease let me know the payment details.`;
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${message}`, '_blank');
-  };
-
-  const modalColors = selectedProduct ? (parseSupabaseArray(selectedProduct.colors).length > 0 ? parseSupabaseArray(selectedProduct.colors) : ['Standard']) : [];
-  const modalSizes = selectedProduct ? (parseSupabaseArray(selectedProduct.sizes).length > 0 ? parseSupabaseArray(selectedProduct.sizes) : ['OS']) : [];
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('payment=success')) {
+      setCart([]);
+      setIsCartOpen(false);
+      setIsCheckoutOpen(false);
+      alert("Payment Successful! We have sent your receipt to your email.");
+      window.history.replaceState({}, document.title, "/");
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#FFFFFF] text-slate-900 font-sans selection:bg-amber-900 selection:text-white overflow-x-hidden">
       
-      {/* PRODUCT MODAL */}
+      {/* CART SIDEBAR */}
+      <div className={`fixed inset-0 z-[70] transition-opacity duration-300 ${isCartOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
+        <div className={`absolute top-0 right-0 w-full md:w-[400px] h-full bg-white shadow-2xl flex flex-col transition-transform duration-300 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="flex items-center justify-between p-6 border-b border-slate-100">
+            <h2 className="text-xl font-serif text-slate-900">Your Cart ({cart.reduce((a, b) => a + b.quantity, 0)})</h2>
+            <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={20} /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            {cart.length === 0 ? (
+              <div className="text-center text-slate-400 mt-10 text-sm">Your cart is empty.</div>
+            ) : (
+              cart.map(item => (
+                <div key={item.cartId} className="flex gap-4 items-center">
+                  <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded-sm border border-slate-200" />
+                  <div className="flex-1">
+                    <p className="font-bold text-sm text-slate-900 line-clamp-1">{item.name}</p>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Color: {item.color} | Size: {item.size}</p>
+                    <p className="text-amber-700 font-bold text-sm mt-2">₦{item.price.toLocaleString()}</p>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center border border-slate-200 rounded-sm">
+                      <button onClick={() => updateQuantity(item.cartId, -1)} className="px-2 py-1 hover:bg-slate-100 text-slate-600">-</button>
+                      <span className="px-2 text-xs font-bold">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.cartId, 1)} className="px-2 py-1 hover:bg-slate-100 text-slate-600">+</button>
+                    </div>
+                    <button onClick={() => removeFromCart(item.cartId)} className="text-red-500 hover:text-red-700 text-[10px] uppercase tracking-widest flex items-center gap-1"><Trash2 size={12}/> Remove</button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {cart.length > 0 && (
+            <div className="p-6 border-t border-slate-100 bg-slate-50">
+              <div className="flex justify-between items-center mb-6">
+                <span className="text-slate-500 text-sm uppercase tracking-widest font-bold">Subtotal</span>
+                <span className="text-xl font-serif text-slate-900">₦{cartTotal.toLocaleString()}</span>
+              </div>
+              <button onClick={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }} className="w-full bg-slate-900 text-white py-4 font-bold uppercase tracking-widest text-[11px] rounded-sm hover:bg-amber-700 transition">
+                Proceed to Checkout
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* CHECKOUT MODAL */}
+      {isCheckoutOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 md:p-12">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => !orderSuccess && setIsCheckoutOpen(false)}></div>
+          <div className="relative bg-white w-full max-w-2xl rounded-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50">
+              <h2 className="text-2xl font-serif text-slate-900">Secure Checkout</h2>
+              {!orderSuccess && <button onClick={() => setIsCheckoutOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition"><X size={20} /></button>}
+            </div>
+            
+            <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar">
+              {orderSuccess ? (
+                <div className="text-center py-12">
+                  <CheckCircle className="text-green-500 mx-auto mb-4" size={60} />
+                  <h3 className="text-3xl font-serif text-slate-900 mb-2">Order Confirmed</h3>
+                  <p className="text-slate-600 mb-6 max-w-md mx-auto">Thank you, {checkoutForm.name}! Your order has been securely recorded.</p>
+                  <div className="bg-slate-50 border border-slate-200 p-6 rounded-sm mb-8 inline-block">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Your Tracking Number</p>
+                    <p className="text-2xl font-bold tracking-widest text-slate-900">{orderTrackingNumber}</p>
+                  </div>
+                  <p className="text-xs text-amber-700 font-bold uppercase tracking-widest mb-8">We will contact you shortly regarding payment & delivery.</p>
+                  <button onClick={() => { setOrderSuccess(false); setIsCheckoutOpen(false); window.location.reload(); }} className="bg-slate-900 text-white px-8 py-4 uppercase tracking-widest text-[10px] font-bold rounded-sm w-full md:w-auto hover:bg-slate-800">
+                    Return to Store
+                  </button>
+                </div>
+              ) : (<form onSubmit={handleCheckoutSubmit} className="space-y-6">
+                  {/* Delivery Selection */}
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Delivery Method</label>
+                    <div className="grid grid-cols-1 gap-3">
+                      {deliveryOptions.map(option => (
+                        <label key={option.id} className={`flex items-center justify-between p-4 border rounded-sm cursor-pointer transition ${selectedDelivery?.id === option.id ? 'border-amber-700 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                          <div className="flex items-center gap-3">
+                            <input type="radio" name="delivery" checked={selectedDelivery?.id === option.id} onChange={() => setSelectedDelivery(option)} className="text-amber-700 focus:ring-amber-700" />
+                            <div>
+                              <p className="font-bold text-sm text-slate-900">{option.name}</p>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-widest">{option.estimated_time}</p>
+                            </div>
+                          </div>
+                          <span className="font-bold text-amber-700">₦{Number(option.fee).toLocaleString()}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Full Name</label>
+                      <input required type="text" value={checkoutForm.name} onChange={(e) => setCheckoutForm({...checkoutForm, name: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition text-sm" placeholder="e.g. Jane Doe" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Phone Number</label>
+                      <input required type="tel" value={checkoutForm.phone} onChange={(e) => setCheckoutForm({...checkoutForm, phone: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition text-sm" placeholder="e.g. 080..." />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Email Address</label>
+                    <input required type="email" value={checkoutForm.email} onChange={(e) => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition text-sm" placeholder="jane@example.com" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Full Delivery Address</label>
+                    <textarea required rows={3} value={checkoutForm.address} onChange={(e) => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition text-sm" placeholder="Street, City, State..." />
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-sm">
+                    <div className="flex justify-between text-sm text-slate-600 mb-2"><span>Subtotal:</span> <span>₦{cartTotal.toLocaleString()}</span></div>
+                    <div className="flex justify-between text-sm text-slate-600 mb-4 border-b border-slate-200 pb-4"><span>Delivery Fee:</span> <span>₦{deliveryFee.toLocaleString()}</span></div>
+                    <div className="flex justify-between text-lg font-bold text-slate-900"><span>Grand Total:</span> <span className="text-amber-700">₦{grandTotal.toLocaleString()}</span></div>
+                  </div>
+
+                  <button type="submit" disabled={isSubmittingOrder} className="w-full bg-slate-900 text-white py-4 mt-4 uppercase tracking-widest text-[11px] font-bold rounded-sm hover:bg-amber-700 transition flex justify-center items-center gap-2">
+                    {isSubmittingOrder ? 'Processing Order...' : `Complete Order • ₦${grandTotal.toLocaleString()}`}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRODUCT DETAILS MODAL */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-0 md:p-12">
+        <div className="fixed inset-0 z-[50] flex items-center justify-center p-0 md:p-12">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-pointer" onClick={() => setSelectedProduct(null)}></div>
           <div className="relative bg-white w-full h-full md:h-auto md:max-w-5xl md:max-h-[95vh] overflow-hidden flex flex-col md:flex-row shadow-2xl">
             <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 z-50 bg-white/90 text-black p-2 rounded-full shadow-md backdrop-blur-md hover:bg-slate-100 transition"><X size={20} /></button>
             <div className="w-full md:w-1/2 h-[50vh] md:h-[85vh] bg-slate-50 relative group border-b md:border-b-0 md:border-r border-slate-200">
-              <div ref={scrollRef} onScroll={handleModalScroll} className="flex overflow-x-auto snap-x snap-mandatory h-full w-full custom-scrollbar scroll-smooth" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+              <div ref={scrollRef} onScroll={(e) => setCurrentImageIndex(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))} className="flex overflow-x-auto snap-x snap-mandatory h-full w-full custom-scrollbar scroll-smooth" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {productImages.map((img, idx) => (
                   <div key={idx} className="min-w-full h-full snap-center relative shrink-0 flex items-center justify-center p-0 md:p-8">
-                    <img src={img} className="w-full h-full object-cover md:rounded-sm shadow-sm" alt={`${selectedProduct.name} - Angle ${idx + 1}`} />
+                    <img src={img} className="w-full h-full object-cover md:rounded-sm shadow-sm" alt="Product Angle" />
                   </div>
                 ))}
               </div>
-              {productImages.length > 1 && (
-                <>
-                  <button onClick={() => slideGallery('left')} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-black p-2 rounded-full shadow-md backdrop-blur-md transition opacity-0 group-hover:opacity-100 hidden md:block"><ChevronLeft size={20} /></button>
-                  <button onClick={() => slideGallery('right')} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-black p-2 rounded-full shadow-md backdrop-blur-md transition opacity-0 group-hover:opacity-100 hidden md:block"><ChevronRight size={20} /></button>
-                  <div className="absolute bottom-4 right-4 bg-slate-900/80 text-white text-[10px] tracking-widest px-3 py-1.5 backdrop-blur-md pointer-events-none">
-                    {currentImageIndex + 1} / {productImages.length}
-                  </div>
-                </>
-              )}
+              <div className="absolute bottom-4 right-4 bg-slate-900/80 text-white text-[10px] tracking-widest px-3 py-1.5 backdrop-blur-md">{currentImageIndex + 1} / {productImages.length}</div>
             </div>
             
             <div className="w-full md:w-1/2 p-6 md:p-12 flex flex-col h-[50vh] md:h-[85vh] overflow-y-auto">
@@ -180,8 +402,8 @@ export default function LuxePublicSite() {
               <div className="mb-6">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 block mb-3">Color / Tone</span>
                 <div className="flex flex-wrap gap-2">
-                  {modalColors.map((c: string) => (
-                     <button key={c} onClick={() => setSelectedColor(c)} className={`px-4 py-2 text-[10px] md:text-xs tracking-wide uppercase transition border ${selectedColor === c ? 'border-amber-700 text-amber-800 bg-amber-50 font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-400'}`}>{c}</button>
+                  {(parseSupabaseArray(selectedProduct.colors).length > 0 ? parseSupabaseArray(selectedProduct.colors) : ['Standard']).map((c: string) => (
+                     <button key={c} onClick={() => setSelectedColor(c)} className={`px-4 py-2 text-[10px] md:text-xs tracking-wide uppercase transition border ${selectedColor === c ? 'border-amber-700 text-amber-800 bg-amber-50 font-bold' : 'border-slate-200 text-slate-600'}`}>{c}</button>
                   ))}
                 </div>
               </div>
@@ -189,25 +411,19 @@ export default function LuxePublicSite() {
               <div className="mb-8">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 block mb-3">Size / Fit</span>
                 <div className="flex flex-wrap gap-2">
-                  {modalSizes.map((s: string) => (
-                     <button key={s} onClick={() => setSelectedSize(s)} className={`px-4 py-2 text-[10px] md:text-xs tracking-wide uppercase transition border ${selectedSize === s ? 'border-amber-700 text-amber-800 bg-amber-50 font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-400'}`}>{s}</button>
+                  {(parseSupabaseArray(selectedProduct.sizes).length > 0 ? parseSupabaseArray(selectedProduct.sizes) : ['OS']).map((s: string) => (
+                     <button key={s} onClick={() => setSelectedSize(s)} className={`px-4 py-2 text-[10px] md:text-xs tracking-wide uppercase transition border ${selectedSize === s ? 'border-amber-700 text-amber-800 bg-amber-50 font-bold' : 'border-slate-200 text-slate-600'}`}>{s}</button>
                   ))}
                 </div>
               </div>
               
-              {/* SINGLE ADD TO CART / CHECKOUT BUTTON */}
               <div className="mb-8 shrink-0 w-full">
-                <button 
-                  disabled={selectedProduct.stock_count === 0} 
-                  onClick={handleCheckout} 
-                  className={`w-full py-4 px-4 text-[11px] md:text-[12px] font-bold tracking-widest uppercase transition text-center shadow-lg rounded-sm ${selectedProduct.stock_count === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-slate-800 hover:-translate-y-0.5'}`}
-                >
-                  {selectedProduct.stock_count === 0 ? 'Out of Stock' : 'Add to Cart & Checkout'}
+                <button disabled={selectedProduct.stock_count === 0} onClick={addToCart} className={`w-full py-4 px-4 text-[11px] md:text-[12px] font-bold tracking-widest uppercase transition text-center shadow-lg rounded-sm ${selectedProduct.stock_count === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-amber-700 hover:-translate-y-0.5'}`}>
+                  {selectedProduct.stock_count === 0 ? 'Out of Stock' : 'Add to Cart'}
                 </button>
               </div>
 
               <div className="w-full h-[1px] bg-slate-100 mb-6"></div>
-
               <div className="pb-8">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 block mb-4">Product Details</span>
                 <FormattedDescription text={selectedProduct.description} />
@@ -217,18 +433,30 @@ export default function LuxePublicSite() {
         </div>
       )}
 
-      {/* NAVIGATION BAR */}
-      <nav className="fixed top-0 left-0 w-full z-50 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-slate-100 transition-all duration-300">
+      {/* TOP NAVIGATION */}
+      <nav className="fixed top-0 left-0 w-full z-40 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-slate-100 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 md:px-16 h-16 md:h-20 flex items-center justify-between">
           <div className="text-xl md:text-2xl font-serif font-bold tracking-widest text-slate-900">LUXE & CO.</div>
+          
           <div className="hidden md:flex gap-8 text-[10px] font-bold tracking-widest uppercase text-slate-500">
             <a href="#premium" className="hover:text-amber-700 transition duration-300">Premium Line</a>
             <a href="#catalog" className="hover:text-amber-700 transition duration-300">Full Catalog</a>
             <a href="#testimonials" className="hover:text-amber-700 transition duration-300">Testimonials</a>
           </div>
-          <button className="md:hidden text-slate-900 hover:text-amber-700 transition" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+
+          <div className="flex items-center gap-6">
+            <button onClick={() => setIsCartOpen(true)} className="relative text-slate-900 hover:text-amber-700 transition">
+              <ShoppingCart size={22} />
+              {cart.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-amber-600 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                  {cart.reduce((total, item) => total + item.quantity, 0)}
+                </span>
+              )}
+            </button>
+            <button className="md:hidden text-slate-900 hover:text-amber-700 transition" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
         <div className={`md:hidden absolute top-16 left-0 w-full bg-white border-b border-slate-100 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-80 opacity-100 py-6' : 'max-h-0 opacity-0 py-0'}`}>
           <div className="flex flex-col px-6 gap-6 text-xs tracking-widest uppercase font-bold text-slate-600">
@@ -242,8 +470,7 @@ export default function LuxePublicSite() {
       {/* HERO SECTION */}
       <section className="relative pt-24 pb-12 md:pt-32 md:pb-24 px-6 md:px-16 bg-[#FDFBF7] border-b border-slate-100">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-8 md:gap-16">
-          <div className="w-full md:w-1/2 relative z-10">
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-serif leading-[1.1] mb-4 md:mb-6 text-slate-900">CROWNED IN <br />ELEGANCE.</h1>
+          <div className="w-full md:w-1/2 relative z-10"><h1 className="text-4xl sm:text-5xl md:text-7xl font-serif leading-[1.1] mb-4 md:mb-6 text-slate-900">CROWNED IN <br />ELEGANCE.</h1>
             <p className="text-sm md:text-lg font-light mb-8 md:mb-10 max-w-md text-slate-600 leading-relaxed">Curated luxury fashion, premium apparel, and accessories for the modern, unapologetic individual.</p>
             <a href="#catalog" className="inline-block bg-slate-900 text-white px-8 md:px-10 py-3.5 md:py-4 text-center font-bold uppercase tracking-widest text-[10px] md:text-xs hover:bg-amber-700 transition shadow-xl rounded-sm">Shop Collection</a>
           </div>
@@ -254,15 +481,13 @@ export default function LuxePublicSite() {
       </section>
 
       {/* FILTER BAR */}
-      <div className="sticky top-16 md:top-20 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 py-3 md:py-4 px-6 md:px-16 overflow-x-auto custom-scrollbar flex gap-2 md:gap-4 justify-start md:justify-center">
+      <div className="sticky top-16 md:top-20 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 py-3 md:py-4 px-6 md:px-16 overflow-x-auto custom-scrollbar flex gap-2 md:gap-4 justify-start md:justify-center">
         {filters.map(filter => (
-          <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-4 py-2 text-[10px] md:text-xs font-bold uppercase tracking-widest whitespace-nowrap transition border rounded-sm ${activeFilter === filter ? 'border-amber-700 text-amber-800 bg-amber-50' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>
-            {filter}
-          </button>
+          <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-4 py-2 text-[10px] md:text-xs font-bold uppercase tracking-widest whitespace-nowrap transition border rounded-sm ${activeFilter === filter ? 'border-amber-700 text-amber-800 bg-amber-50' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>{filter}</button>
         ))}
       </div>
 
-      {/* CATALOG SECTION */}
+      {/* MAIN CATALOG */}
       <section id="catalog" className="relative py-16 md:py-24 px-6 md:px-16 bg-[#FFFFFF]">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-end mb-8 md:mb-12">
@@ -270,21 +495,36 @@ export default function LuxePublicSite() {
               <h2 className="text-[10px] md:text-xs font-bold tracking-widest text-amber-700 uppercase mb-1 md:mb-2">New Arrivals</h2>
               <h3 className="text-2xl md:text-4xl font-serif text-slate-900">Main Catalog</h3>
             </div>
-            <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{filteredProducts.length} Items • Swipe</div>
+            <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{filteredProducts.length} Total Items</div>
           </div>
-          <div className="flex flex-nowrap gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory custom-scrollbar pb-6 -mx-6 px-6 md:mx-0 md:px-0">
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
             {filteredProducts.length > 0 ? (
-              filteredProducts.slice(0, 10).map((item) => (
-                <div key={item.id} className="snap-start shrink-0 w-[65vw] md:w-[280px]"><ProductCard item={item} onSelect={handleSelectProduct} /></div>
+              filteredProducts.slice(0, visibleMain).map((item) => (
+                <div key={item.id} className="w-full">
+                  <ProductCard item={item} onSelect={handleSelectProduct} />
+                </div>
               ))
             ) : (
-              <div className="w-full text-center text-slate-400 py-16 border border-dashed border-slate-200 text-xs md:text-sm">No items found for this category.</div>
+              <div className="col-span-full w-full text-center text-slate-400 py-16 border border-dashed border-slate-200 text-xs md:text-sm">No items found for this category.</div>
             )}
           </div>
+
+          {/* LOAD MORE BUTTON */}
+          {filteredProducts.length > visibleMain && (
+            <div className="mt-12 flex justify-center">
+              <button 
+                onClick={() => setVisibleMain(prev => prev + 10)} 
+                className="border border-slate-900 text-slate-900 px-8 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-900 hover:text-white transition"
+              >
+                Load More Products
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* PREMIUM COLLECTION SECTION */}
+      {/* PREMIUM COLLECTION */}
       <section id="premium" className="relative py-16 md:py-24 px-6 md:px-16 bg-[#FDFBF7] border-t border-slate-100">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-end mb-8 md:mb-12">
@@ -292,41 +532,70 @@ export default function LuxePublicSite() {
               <h2 className="text-[10px] md:text-xs font-bold tracking-widest text-amber-700 uppercase mb-1 md:mb-2">Exclusive Line</h2>
               <h3 className="text-2xl md:text-4xl font-serif text-slate-900">Premium Collection</h3>
             </div>
-            <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{premiumProducts.slice(0, 10).length} Items • Swipe</div>
+            <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{premiumProducts.length} Total Items</div>
           </div>
-          <div className="flex flex-nowrap gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory custom-scrollbar pb-6 -mx-6 px-6 md:mx-0 md:px-0">
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
             {premiumProducts.length > 0 ? (
-              premiumProducts.slice(0, 10).map((item) => (
-                <div key={item.id} className="snap-start shrink-0 w-[65vw] md:w-[280px]"><ProductCard item={item} onSelect={handleSelectProduct} /></div>
+              premiumProducts.slice(0, visiblePremium).map((item) => (
+                <div key={item.id} className="w-full">
+                  <ProductCard item={item} onSelect={handleSelectProduct} />
+                </div>
               ))
             ) : (
-              <div className="w-full text-center text-slate-400 py-16 border border-dashed border-slate-200 text-xs md:text-sm">Premium catalog is currently empty.</div>
+              <div className="col-span-full w-full text-center text-slate-400 py-16 border border-dashed border-slate-200 text-xs md:text-sm">Premium catalog is currently empty.</div>
             )}
           </div>
+
+          {/* LOAD MORE BUTTON */}
+          {premiumProducts.length > visiblePremium && (
+            <div className="mt-12 flex justify-center">
+              <button 
+                onClick={() => setVisiblePremium(prev => prev + 10)} 
+                className="border border-slate-900 text-slate-900 px-8 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-900 hover:text-white transition"
+              >
+                Discover More Premium
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* TESTIMONIALS SECTION */}
+      {/* BRAND WORLD / VERIFIED VENDORS */}
+      {vendors.length > 0 && (
+        <section className="relative py-16 px-6 md:px-16 bg-slate-900 border-t border-slate-800">
+          <div className="max-w-7xl mx-auto text-center">
+            <h2 className="text-[10px] md:text-xs font-bold tracking-widest text-amber-500 uppercase mb-3">The Brand World</h2>
+            <h3 className="text-xl md:text-2xl font-serif text-white mb-10">Curated from Verified Global Vendors</h3>
+            
+            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
+              {vendors.map((vendor) => (
+                <div key={vendor.id} className="group cursor-pointer">
+                  <img 
+                    src={vendor.logo_url} 
+                    alt={vendor.vendor_name} 
+                    className="h-10 md:h-14 object-contain transition duration-300 group-hover:scale-105"
+                    title={vendor.vendor_name}
+                  />
+                </div>
+              ))}
+            </div>
+            
+            <p className="text-slate-400 text-[10px] uppercase tracking-widest mt-10">Every product is authenticated & guaranteed by LUXE & CO.</p>
+          </div>
+        </section>
+      
+      )}
+
+      {/* TESTIMONIALS */}
       <section id="testimonials" className="relative py-16 md:py-24 px-6 md:px-16 bg-white border-t border-slate-100">
         <div className="max-w-7xl mx-auto">
           <h3 className="text-2xl md:text-4xl font-serif text-slate-900 text-center mb-10 md:mb-16">Client Testimonials</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              {
-                name: "Aisha T.",
-                role: "Verified Buyer",
-                text: "The quality of the premium bags is unmatched. It arrived exactly as pictured, beautifully packaged. I’ve never received so many compliments."
-              },
-              {
-                name: "Sarah M.",
-                role: "VIP Client",
-                text: "LUXE & CO. completely elevated my wardrobe. The detailing on their signature pieces proves they care about true luxury."
-              },
-              {
-                name: "Chika O.",
-                role: "Verified Buyer",
-                text: "Seamless ordering process and exceptional customer service via WhatsApp. The material feels incredible. Definitely my new go-to store."
-              }
+              { name: "Aisha T.", role: "Verified Buyer", text: "The quality of the premium bags is unmatched. It arrived exactly as pictured, beautifully packaged. I’ve never received so many compliments." },
+              { name: "Sarah M.", role: "VIP Client", text: "LUXE & CO. completely elevated my wardrobe. The detailing on their signature pieces proves they care about true luxury." },
+              { name: "Chika O.", role: "Verified Buyer", text: "Seamless ordering process and exceptional customer service. The material feels incredible. Definitely my new go-to store." }
             ].map((testimonial, i) => (
               <div key={i} className="bg-[#FDFBF7] p-8 border border-slate-100 rounded-sm shadow-sm flex flex-col justify-between">
                 <div>
@@ -351,8 +620,7 @@ export default function LuxePublicSite() {
           <div className="md:col-span-2">
             <div className="text-2xl md:text-3xl font-serif font-bold tracking-widest mb-4">LUXE & CO.</div>
             <p className="text-slate-400 font-light text-sm max-w-sm leading-relaxed">Premium fashion and lifestyle curated for the modern, unapologetic individual. Fast shipping, global delivery.</p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-1 gap-8 md:gap-0">
+          </div><div className="grid grid-cols-2 md:grid-cols-1 gap-8 md:gap-0">
             <div>
               <h4 className="text-[10px] font-bold tracking-widest uppercase text-slate-500 mb-4">Shop</h4>
               <ul className="space-y-3 text-xs font-light text-slate-300">
@@ -364,7 +632,6 @@ export default function LuxePublicSite() {
               <h4 className="text-[10px] font-bold tracking-widest uppercase text-slate-500 mb-4">Support</h4>
               <ul className="space-y-3 text-xs font-light text-slate-300">
                 <li><a href="#" className="hover:text-amber-500 transition">Shipping & Returns</a></li>
-                <li><a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" className="hover:text-amber-500 transition">WhatsApp Support</a></li>
               </ul>
             </div>
           </div>

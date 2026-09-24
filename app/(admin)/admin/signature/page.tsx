@@ -1,93 +1,103 @@
-"use client";
-import { useState, useEffect } from 'react';
+'use client';
+import React, { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Plus, Trash2, Scissors } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
-export default function AdminSignatureStyles() {
-  const [styles, setStyles] = useState<any[]>([]);
+export default function AdminPremiumPage() {
+  const supabase = createClient();
+  const [premiumProducts, setPremiumProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Wrapped in useState to prevent Vercel build crashes
-  const [supabase] = useState(() => createClient());
 
   useEffect(() => {
-    fetchStyles();
-  }, []);
+    fetchPremiumProducts();
+  }, [supabase]);
 
-  async function fetchStyles() {
-    const { data } = await supabase.from('signature_products').select('*').order('created_at', { ascending: false });
-    if (data) setStyles(data);
+  const fetchPremiumProducts = async () => {
+    const { data, error } = await supabase
+      .from('signature_products')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setPremiumProducts(data);
+    }
     setLoading(false);
-  }
+  };
 
-  async function deleteStyle(id: string) {
-    if (!confirm("Are you sure you want to delete this signature style?")) return;
-    await supabase.from('signature_products').delete().eq('id', id);
-    fetchStyles();
-  }
+  const deleteProduct = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this premium product?")) return;
+    const { error } = await supabase.from('signature_products').delete().eq('id', id);
+    if (!error) {
+      setPremiumProducts(premiumProducts.filter(p => p.id !== id));
+    } else {
+      alert("Failed to delete product.");
+    }
+  };
+
+  if (loading) return <div className="p-6 text-xs font-bold uppercase tracking-widest text-slate-400">Loading Premium Line...</div>;
 
   return (
-    <div className="max-w-5xl mx-auto pb-12">
-      <div className="flex justify-between items-center mb-10">
+    <div className="p-6 max-w-7xl mx-auto bg-white min-h-screen">
+      
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-serif text-slate-900 mb-2">Signature Styles</h1>
-          <p className="text-slate-500">Manage your premium hair braiding services.</p>
+          <h1 className="text-2xl font-serif font-bold text-slate-900 tracking-tight">Premium Line</h1>
+          <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">Manage Exclusive Signature Products</p>
         </div>
-        <Link href="/admin/signature/add" className="bg-slate-900 text-white px-6 py-3 flex items-center gap-2 rounded-sm hover:bg-slate-800 transition">
-          <Plus size={18} /> Add Style
+        <Link href="/admin/signature/new" className="bg-slate-900 text-white px-6 py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-amber-700 transition shadow-sm">
+          + Add Premium Product
         </Link>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-sm overflow-hidden shadow-sm">
-        {/* Mobile scroll wrapper */}
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left border-collapse whitespace-nowrap min-w-[800px]">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-sm tracking-widest uppercase text-slate-500">
-                <th className="p-4 font-medium">Style</th>
-                <th className="p-4 font-medium">Category</th>
-                <th className="p-4 font-medium">Price</th>
-                <th className="p-4 font-medium">Status</th>
-                <th className="p-4 font-medium text-right">Actions</th>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b-2 border-slate-900 text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+              <th className="pb-4 pr-4">PRODUCT</th>
+              <th className="pb-4 px-4">CATEGORY</th>
+              <th className="pb-4 px-4">PRICE</th>
+              <th className="pb-4 px-4">STOCK</th>
+              <th className="pb-4 px-4">STATUS</th>
+              <th className="pb-4 pl-4 text-right">ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody className="text-sm">
+            {premiumProducts.map((product) => (
+              <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                <td className="py-4 pr-4 flex items-center gap-4">
+                  <img src={product.image_url || 'https://placehold.co/100'} alt={product.name} className="w-12 h-12 rounded object-cover border border-slate-200" />
+                  <span className="font-bold text-slate-900 uppercase">{product.name}</span>
+                </td>
+                <td className="py-4 px-4 text-slate-600">{product.category}</td>
+                <td className="py-4 px-4 font-mono font-medium text-amber-700">
+                  ₦{Number(product.price).toLocaleString()}
+                </td>
+                <td className="py-4 px-4 font-mono font-medium">
+                  {/* Color code stock levels for easy reading */}
+                  <span className={product.stock_count > 5 ? "text-slate-900" : product.stock_count > 0 ? "text-amber-600" : "text-red-600 font-bold"}>
+                    {product.stock_count}
+                  </span>
+                </td>
+                <td className="py-4 px-4">
+                  <span className={`text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-sm ${product.stock_count > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {product.stock_count > 0 ? 'Active' : 'Out of Stock'}
+                  </span>
+                </td>
+                <td className="py-4 pl-4 text-right">
+                  <button onClick={() => deleteProduct(product.id)} className="text-red-400 hover:text-red-700 transition">
+                    <Trash2 size={16} />
+                  </button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={5} className="p-8 text-center text-slate-500">Loading styles...</td></tr>
-              ) : styles.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-12 text-center text-slate-500">
-                    <Scissors className="mx-auto text-slate-300 mb-3" size={32} />
-                    No signature styles found. Add one to get started.
-                  </td>
-                </tr>
-              ) : (
-                styles.map((style) => (
-                  <tr key={style.id} className="hover:bg-slate-50 transition group">
-                    <td className="p-4 flex items-center gap-4">
-                      <img src={style.image_url || "https://placehold.co/100x125"} alt="" className="w-10 h-12 rounded-sm object-cover border border-slate-200" />
-                      <span className="font-medium text-slate-900">{style.name}</span>
-                    </td>
-                    <td className="p-4 text-slate-600">{style.category}</td>
-                    <td className="p-4 text-slate-600">₦{style.price?.toLocaleString()}</td>
-                    <td className="p-4">
-                      <span className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full">{style.status}</span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => deleteStyle(style.id)} className="text-red-500 hover:text-red-700 p-2 bg-red-50 rounded-sm">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
+        {premiumProducts.length === 0 && (
+          <div className="text-center py-16 text-slate-400 text-sm font-medium">No premium products found in the database.</div>
+        )}
       </div>
+
     </div>
   );
 }
