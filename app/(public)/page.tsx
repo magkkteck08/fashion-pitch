@@ -43,7 +43,7 @@ const ProductCard = ({ item, onSelect }: { item: any, onSelect: (item: any) => v
 
   return (
     <div className="group cursor-pointer flex flex-col h-full w-full relative z-10" onClick={() => onSelect(item)}>
-      <div className="relative aspect-square mb-3 overflow-hidden bg-slate-100 shadow-sm border border-slate-200">
+      <div className="relative aspect-square mb-3 overflow-hidden bg-slate-50 shadow-sm border border-slate-100 group-hover:shadow-2xl group-hover:shadow-amber-900/10 group-hover:border-amber-200 transition-all duration-500">
         <img src={item.image_url || "https://placehold.co/800x800"} alt={item.name} loading="lazy" className={`w-full h-full object-cover transition duration-700 ${isOutOfStock ? 'grayscale opacity-70' : 'group-hover:scale-105'}`} />
         <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-slate-900 text-[8px] md:text-[9px] uppercase tracking-widest px-2.5 py-1 shadow-sm border border-slate-100">{item.category}</div>
         {totalImages > 1 && (<div className="absolute top-3 right-3 bg-black/70 text-white text-[9px] tracking-widest px-2 py-1 backdrop-blur-md flex items-center gap-1"><ImageIcon size={10} /> {totalImages}</div>)}
@@ -193,7 +193,7 @@ export default function LuxePublicSite() {
     }));
   };
 
-  
+
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   const deliveryFee = selectedDelivery ? Number(selectedDelivery.fee) : 0;
   const grandTotal = cartTotal + deliveryFee;
@@ -249,6 +249,11 @@ export default function LuxePublicSite() {
 
   return (
     <div className="min-h-screen bg-[#FFFFFF] text-slate-900 font-sans selection:bg-amber-900 selection:text-white overflow-x-hidden">
+
+      {/* TOP ANNOUNCEMENT BAR */}
+      <div className="bg-slate-900 text-amber-500 text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-center py-2.5 px-4 z-50 relative">
+        Complimentary Global Shipping on Signature Orders over ₦250,000
+      </div>
       
       {/* CART SIDEBAR */}
       <div className={`fixed inset-0 z-[70] transition-opacity duration-300 ${isCartOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
@@ -563,7 +568,7 @@ export default function LuxePublicSite() {
 
       {/* BRAND WORLD / VERIFIED VENDORS */}
       {vendors.length > 0 && (
-        <section className="relative py-16 px-6 md:px-16 bg-slate-900 border-t border-slate-800">
+        <section className="relative py-20 px-6 md:px-16 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-950 border-t border-slate-800 shadow-inner">
           <div className="max-w-7xl mx-auto text-center">
             <h2 className="text-[10px] md:text-xs font-bold tracking-widest text-amber-500 uppercase mb-3">The Brand World</h2>
             <h3 className="text-xl md:text-2xl font-serif text-white mb-10">Curated from Verified Global Vendors</h3>

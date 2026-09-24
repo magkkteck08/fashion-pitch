@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Eye, X, MapPin, Phone, Mail, Package, ShoppingBag } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
@@ -9,52 +9,90 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
-  useEffect(() => {
-    fetchOrders();
+  // Notification State
+  const [showToast, setShowToast] = useState(false);
+  const [newOrderData, setNewOrderData] = useState<any | null>(null);
+  
+  // THE BULLETPROOF TRACKERS
+  const latestOrderId = useRef<string | null>(null);
+  const isFirstLoad = useRef<boolean>(true);
 
-    // 1. Request Browser Notification Permission on mount
+  useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       Notification.requestPermission();
     }
 
-    // 2. Subscribe to Supabase Realtime for instant New Order notifications
-    const channel = supabase
-      .channel('realtime-orders')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
-        (payload) => {
-          const newOrder = payload.new;
-          
-          // Instantly add the new order to the top of the table
-          setOrders((prevOrders) => [newOrder, ...prevOrders]);
+    let intervalId: NodeJS.Timeout;
 
-          // Trigger OS-level Browser Notification
+    const fetchAndPollOrders = async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        
+        // 1. Initial Page Load
+        if (isFirstLoad.current) {
+          latestOrderId.current = data[0].id;
+          setOrders(data);
+          setLoading(false);
+          isFirstLoad.current = false;
+          return;
+        }
+
+        // 2. Polling Check (Every 5 seconds)
+        const newestOrder = data[0];
+
+        // If the newest order in the DB doesn't match our saved ID, IT'S NEW!
+        if (latestOrderId.current && newestOrder.id !== latestOrderId.current) {
+          
+          // Instantly update our tracker so we don't spam notifications
+          latestOrderId.current = newestOrder.id;
+
+          // Update the UI table safely
+          setOrders((prev) => {
+            if (prev.some(o => o.id === newestOrder.id)) return prev;
+            return [newestOrder, ...prev];
+          });
+
+          // Trigger In-App Toast
+          setNewOrderData(newestOrder);
+          setShowToast(true);
+          
+          // Play Audio
+          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+          audio.volume = 0.5;
+          audio.play().catch(e => console.log('Audio blocked by browser', e));
+
+          // Trigger OS Notification
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
             new Notification('🛍️ New Order Received!', {
-              body: `${newOrder.customer_name} just placed an order for #${newOrder.total_amount?.toLocaleString()}`,
+              body: `${newestOrder.customer_name} ordered for ₦${newestOrder.total_amount?.toLocaleString()}`,
             });
           }
+
+          setTimeout(() => setShowToast(false), 8000);
+        } else {
+          // If no new orders, just silently refresh the table in case statuses were updated elsewhere
+          setOrders(data);
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+      } else if (isFirstLoad.current) {
+        // Handle empty database on first load
+        setLoading(false);
+        isFirstLoad.current = false;
+      }
     };
-  }, [supabase]);
 
-  const fetchOrders = async () => {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Run once immediately, then loop every 5 seconds
+    fetchAndPollOrders();
+    intervalId = setInterval(fetchAndPollOrders, 5000);
 
-    if (!error && data) {
-      setOrders(data);
-    }
-    setLoading(false);
-  };
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
+    
+    // CRITICAL FIX: Empty dependency array means this strictly sets up ONCE and never wipes its memory.
+  }, []); 
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     const { error } = await supabase
@@ -83,7 +121,7 @@ export default function AdminOrdersPage() {
   if (loading) return <div className="p-6 text-xs font-bold uppercase tracking-widest text-slate-400">Loading Orders...</div>;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto bg-white min-h-screen">
+    <div className="p-6 max-w-7xl mx-auto bg-white min-h-screen relative overflow-hidden">
       
       <div className="mb-8">
         <h1 className="text-2xl font-serif font-bold text-slate-900 tracking-tight">Order Management</h1>
@@ -120,7 +158,7 @@ export default function AdminOrdersPage() {
                   </button>
                 </td>
                 <td className="py-4 px-4 font-mono font-medium text-slate-900">
-                  #{Number(order.total_amount).toLocaleString()}
+                  ₦{Number(order.total_amount).toLocaleString()}
                 </td>
                 <td className="py-4 px-4">
                   <span className={`text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-sm ${getStatusColor(order.status)}`}>
@@ -165,7 +203,6 @@ export default function AdminOrdersPage() {
 
             <div className="p-6 overflow-y-auto custom-scrollbar">
               
-              {/* Customer Contact Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div>
                   <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Customer Information</h3>
@@ -194,7 +231,6 @@ export default function AdminOrdersPage() {
                 </div>
               </div>
 
-              {/* Order Items Breakdown */}
               <div>
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
                   <Package size={14} /> Purchased Items
@@ -214,7 +250,7 @@ export default function AdminOrdersPage() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-bold text-sm text-slate-900 font-mono">#{Number(item.price).toLocaleString()}</p>
+                            <p className="font-bold text-sm text-slate-900 font-mono">₦{Number(item.price).toLocaleString()}</p>
                             <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Qty: {item.quantity}</p>
                           </div>
                         </div>
@@ -223,7 +259,7 @@ export default function AdminOrdersPage() {
                   )}
                   <div className="bg-slate-50 p-4 flex justify-between items-center border-t border-slate-200">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Grand Total</span>
-                    <span className="text-lg font-bold text-amber-700 font-mono">#{Number(selectedOrder.total_amount).toLocaleString()}</span>
+                    <span className="text-lg font-bold text-amber-700 font-mono">₦{Number(selectedOrder.total_amount).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -232,6 +268,29 @@ export default function AdminOrdersPage() {
           </div>
         </div>
       )}
+
+      {/* IN-APP REALTIME NOTIFICATION TOAST */}
+      <div className={`fixed bottom-6 right-6 z-50 transition-all duration-500 transform ${showToast ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'}`}>
+        {newOrderData && (
+          <div className="bg-slate-900 border-l-4 border-amber-500 text-white p-4 rounded shadow-2xl flex items-start gap-4 min-w-[300px]">
+            <div className="bg-amber-500/20 p-2 rounded text-amber-500 mt-1">
+              <Package size={20} />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-[10px] uppercase tracking-widest font-bold text-amber-500 mb-1">New Order Received</h4>
+              <p className="font-bold text-sm">{newOrderData.customer_name}</p>
+              <p className="text-xs text-slate-400 font-mono mt-1">₦{Number(newOrderData.total_amount).toLocaleString()}</p>
+              <button 
+                onClick={() => { setSelectedOrder(newOrderData); setShowToast(false); }}
+                className="mt-3 text-[10px] font-bold uppercase tracking-widest border border-slate-700 px-3 py-1.5 rounded hover:bg-slate-800 transition w-full"
+              >
+                View Details
+              </button>
+            </div>
+            <button onClick={() => setShowToast(false)} className="text-slate-500 hover:text-white"><X size={16}/></button>
+          </div>
+        )}
+      </div>
 
     </div>
   );
