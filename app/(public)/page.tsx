@@ -439,7 +439,7 @@ export default function LuxePublicSite() {
       )}
 
       {/* TOP NAVIGATION */}
-      <nav className="fixed top-0 left-0 w-full z-40 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-slate-100 transition-all duration-300">
+      <nav className="sticky top-0 left-0 w-full z-40 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-slate-100 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 md:px-16 h-16 md:h-20 flex items-center justify-between">
           <div className="text-xl md:text-2xl font-serif font-bold tracking-widest text-slate-900">LUXE & CO.</div>
           
