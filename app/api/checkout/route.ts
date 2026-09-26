@@ -18,7 +18,6 @@ export async function POST(req: Request) {
     
     // 1. VALIDATE STOCK FIRST
     for (const item of items) {
-      // Look at the correct table (Main Catalog vs Premium)
       const table = item.tableType || 'products';
       
       const { data: productData, error: productError } = await supabase
@@ -31,7 +30,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: `Product ${item.name} not found.` });
       }
 
-      // If they try to buy more than what is left, reject the order completely
       if (productData.stock_count < item.quantity) {
         return NextResponse.json({ 
           success: false, 
@@ -44,7 +42,7 @@ export async function POST(req: Request) {
     const shortId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const trackingCode = `ORD-${shortId}`;
 
-    // 3. INSERT ORDER
+    // 3. INSERT ORDER (Fixed Status to 'pending')
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert([
@@ -56,7 +54,7 @@ export async function POST(req: Request) {
           items: items, 
           total_amount: totalAmount,
           tracking_code: trackingCode,
-          status: 'payment_confirmed',
+          status: 'pending', // <--- Fixed this line
         }
       ])
       .select()
@@ -68,7 +66,6 @@ export async function POST(req: Request) {
     for (const item of items) {
       const table = item.tableType || 'products';
       
-      // Fetch current stock again to be safe
       const { data: currentProduct } = await supabase
         .from(table)
         .select('stock_count')
@@ -76,7 +73,6 @@ export async function POST(req: Request) {
         .single();
         
       if (currentProduct) {
-        // Subtract purchased quantity
         await supabase
           .from(table)
           .update({ stock_count: currentProduct.stock_count - item.quantity })

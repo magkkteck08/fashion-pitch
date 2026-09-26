@@ -21,36 +21,17 @@ export default function OrderTracking() {
     const cleanInput = trackingCode.trim().toUpperCase();
 
     try {
-      // 1. If the user searches using their Order Number (e.g. ORD-10E6CD)
-      if (cleanInput.startsWith('ORD-')) {
-        const shortId = cleanInput.replace('ORD-', '').toLowerCase();
-        
-        // Fetch orders and find the matching UUID
-        const { data, error: dbError } = await supabase.from('orders').select('id, status');
-        
-        if (dbError || !data) throw new Error();
-        
-        const matchedOrder = data.find(o => o.id.toLowerCase().startsWith(shortId));
-        
-        if (!matchedOrder) {
-          setError('Order number not found. Please check and try again.');
-        } else {
-          setOrderStatus(matchedOrder.status);
-        }
-      } 
-      // 2. If the user searches using a real Tracking Code (e.g. FEDEX-123)
-      else {
-        const { data, error: dbError } = await supabase
-          .from('orders')
-          .select('status')
-          .eq('tracking_code', cleanInput)
-          .single();
-        
-        if (dbError || !data) {
-          setError('Tracking code not found. Please check and try again.');
-        } else {
-          setOrderStatus(data.status);
-        }
+      // 1. Simply query the tracking_code column directly!
+      const { data, error: dbError } = await supabase
+        .from('orders')
+        .select('status')
+        .eq('tracking_code', cleanInput)
+        .single();
+      
+      if (dbError || !data) {
+        setError('Order number not found. Please check and try again.');
+      } else {
+        setOrderStatus(data.status);
       }
     } catch (err) {
       setError('Could not fetch order details. Please try again.');
@@ -62,6 +43,7 @@ export default function OrderTracking() {
   // Helper to determine how far the progress bar should fill
   const getProgressWidth = () => {
     switch(orderStatus) {
+      case 'pending': return 'w-[10%]'; // Shows a little movement while waiting for payment
       case 'payment_confirmed': return 'w-[33%]';
       case 'processing': return 'w-[66%]';
       case 'in_transit': return 'w-[90%]';
@@ -72,6 +54,7 @@ export default function OrderTracking() {
 
   const getStatusMessage = () => {
     switch(orderStatus) {
+      case 'pending': return 'Your order has been recorded. We are awaiting/verifying your manual payment via WhatsApp.';
       case 'payment_confirmed': return 'We have received your payment. Your order will begin processing shortly.';
       case 'processing': return 'Your items are being packed and prepared for shipment.';
       case 'in_transit': return 'Your package has left our facility and is on its way to you.';
@@ -130,6 +113,7 @@ export default function OrderTracking() {
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-100 -z-10"></div>
                 <div className={`absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-amber-700 transition-all duration-1000 ease-out -z-10 ${getProgressWidth()}`}></div>
 
+                {/* Step 1: Payment Confirmed */}
                 <div className="flex flex-col items-center gap-3 bg-white px-2">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors duration-500 ${orderStatus === 'payment_confirmed' || orderStatus === 'processing' || orderStatus === 'in_transit' || orderStatus === 'completed' ? 'border-amber-700 bg-amber-700 text-white' : 'border-slate-200 bg-white text-slate-300'}`}>
                     <CreditCard size={18} />
@@ -137,6 +121,7 @@ export default function OrderTracking() {
                   <span className="text-[10px] uppercase font-bold text-slate-600 tracking-widest text-center w-20">Payment Verified</span>
                 </div>
 
+                {/* Step 2: Processing */}
                 <div className="flex flex-col items-center gap-3 bg-white px-2">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors duration-500 ${orderStatus === 'processing' || orderStatus === 'in_transit' || orderStatus === 'completed' ? 'border-amber-700 bg-amber-700 text-white' : 'border-slate-200 bg-white text-slate-300'}`}>
                     <Package size={18} />
@@ -144,6 +129,7 @@ export default function OrderTracking() {
                   <span className="text-[10px] uppercase font-bold text-slate-600 tracking-widest text-center w-20">Processing</span>
                 </div>
 
+                {/* Step 3: In Transit */}
                 <div className="flex flex-col items-center gap-3 bg-white px-2">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors duration-500 ${orderStatus === 'in_transit' || orderStatus === 'completed' ? 'border-amber-700 bg-amber-700 text-white' : 'border-slate-200 bg-white text-slate-300'}`}>
                     <Truck size={18} />
@@ -151,6 +137,7 @@ export default function OrderTracking() {
                   <span className="text-[10px] uppercase font-bold text-slate-600 tracking-widest text-center w-20">In Transit</span>
                 </div>
 
+                {/* Step 4: Completed */}
                 <div className="flex flex-col items-center gap-3 bg-white px-2">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors duration-500 ${orderStatus === 'completed' ? 'border-amber-700 bg-amber-700 text-white' : 'border-slate-200 bg-white text-slate-300'}`}>
                     <CheckCircle size={18} />
