@@ -61,12 +61,8 @@ export default function LuxePublicSite() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-<<<<<<< HEAD
   
   const [orderSuccess, setOrderSuccess] = useState(false);
-=======
-  const [successOrder, setSuccessOrder] = useState<{ trackingCode: string } | null>(null);
->>>>>>> d149389248901ff9c4c9c58dc9bb650f8cc2c454
   const [orderTrackingNumber, setOrderTrackingNumber] = useState('');
   const [finalTotal, setFinalTotal] = useState(0); 
   
@@ -150,7 +146,6 @@ export default function LuxePublicSite() {
 
       const data = await response.json();
 
-<<<<<<< HEAD
       if (data.success) {
         setFinalTotal(grandTotal); 
         setCart([]);
@@ -161,18 +156,6 @@ export default function LuxePublicSite() {
       } else {
         alert(`Error: ${data.error || 'Server did not provide an error message'}`);
         setIsSubmittingOrder(false);
-=======
-      if (response.ok && data.success) {
-        // 1. Clear the cart data
-        setCart([]);
-        localStorage.removeItem('luxe_cart');
-        
-        // 2. Fire signal to Admin Tab
-        localStorage.setItem('luxe_new_order_signal', Date.now().toString());
-        
-        // 3. TRIGGER CUSTOM LUXURY MODAL INSTEAD OF ALERT
-        setSuccessOrder({ trackingCode: data.trackingCode });
->>>>>>> d149389248901ff9c4c9c58dc9bb650f8cc2c454
       }
     } catch (err) {
       console.error(err);
@@ -184,7 +167,6 @@ export default function LuxePublicSite() {
   return (
     <div className="min-h-screen bg-[#FFFFFF] text-slate-900 font-sans selection:bg-amber-900 selection:text-white">
 
-      {/* --- COMBINED FIXED HEADER --- */}
       <header className="fixed top-0 left-0 w-full z-50 flex flex-col shadow-sm">
         <div className="bg-slate-900 text-amber-500 text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-center py-2.5 px-4">
           Complimentary Global Shipping on Signature Orders over ₦250,000
@@ -225,10 +207,8 @@ export default function LuxePublicSite() {
         </nav>
       </header>
 
-      {/* INVISIBLE SPACER */}
       <div className="h-[100px] md:h-[116px] w-full"></div>
       
-      {/* CART SIDEBAR */}
       <div className={`fixed inset-0 z-[70] transition-opacity duration-300 ${isCartOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
         <div className={`absolute top-0 right-0 w-full md:w-[400px] h-full bg-white shadow-2xl flex flex-col transition-transform duration-300 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -274,7 +254,6 @@ export default function LuxePublicSite() {
         </div>
       </div>
 
-      {/* CHECKOUT MODAL */}
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 md:p-12">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => !orderSuccess && setIsCheckoutOpen(false)}></div>
@@ -295,7 +274,6 @@ export default function LuxePublicSite() {
                     Your order has been recorded. To begin processing your shipment, please complete your payment via bank transfer.
                   </p>
                   
-                  {/* TRACKING NUMBER */}
                   <div className="bg-slate-50 border border-slate-100 p-4 mb-6 inline-block w-full max-w-sm">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
                       Official Tracking Code
@@ -305,7 +283,6 @@ export default function LuxePublicSite() {
                     </p>
                   </div>
 
-                  {/* MANUAL BANK DETAILS */}
                   <div className="bg-amber-50 border border-amber-200 p-6 mb-8 text-left text-sm text-slate-800 rounded-sm mx-auto max-w-sm">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-amber-800 mb-3 border-b border-amber-200 pb-2">Manual Bank Transfer</p>
                     <div className="space-y-3">
@@ -319,7 +296,6 @@ export default function LuxePublicSite() {
                     </div>
                   </div>
                   
-                  {/* WHATSAPP CONFIRMATION BUTTON */}
                   <a
                     href={`https://wa.me/2349073754047?text=Hello LUXE! I just placed an order. My Tracking Number is ${orderTrackingNumber}. Here is my payment proof for ₦${finalTotal.toLocaleString()}.`}
                     target="_blank"
@@ -395,101 +371,6 @@ export default function LuxePublicSite() {
         </div>
       )}
 
-<<<<<<< HEAD
-=======
-      {/* PRODUCT DETAILS MODAL */}
-      {selectedProduct && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center p-0 md:p-12">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-pointer" onClick={() => setSelectedProduct(null)}></div>
-          <div className="relative bg-white w-full h-full md:h-auto md:max-w-5xl md:max-h-[95vh] overflow-hidden flex flex-col md:flex-row shadow-2xl">
-            <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 z-50 bg-white/90 text-black p-2 rounded-full shadow-md backdrop-blur-md hover:bg-slate-100 transition"><X size={20} /></button>
-            <div className="w-full md:w-1/2 h-[50vh] md:h-[85vh] bg-slate-50 relative group border-b md:border-b-0 md:border-r border-slate-200">
-              <div ref={scrollRef} onScroll={(e) => setCurrentImageIndex(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))} className="flex overflow-x-auto snap-x snap-mandatory h-full w-full custom-scrollbar scroll-smooth" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {productImages.map((img, idx) => (
-                  <div key={idx} className="min-w-full h-full snap-center relative shrink-0 flex items-center justify-center p-0 md:p-8">
-                    <img src={img} className="w-full h-full object-cover md:rounded-sm shadow-sm" alt="Product Angle" />
-                  </div>
-                ))}
-              </div>
-              <div className="absolute bottom-4 right-4 bg-slate-900/80 text-white text-[10px] tracking-widest px-3 py-1.5 backdrop-blur-md">{currentImageIndex + 1} / {productImages.length}</div>
-            </div>
-            
-            <div className="w-full md:w-1/2 p-6 md:p-12 flex flex-col h-[50vh] md:h-[85vh] overflow-y-auto">
-              <div className="text-[10px] md:text-xs text-amber-700 uppercase tracking-widest mb-2 font-bold">{selectedProduct.category}</div>
-              <h2 className="text-2xl md:text-4xl font-serif mb-2 text-slate-900 leading-tight">{selectedProduct.name}</h2>
-              <p className="text-xl md:text-2xl text-amber-700 font-medium mb-6">₦{selectedProduct.price?.toLocaleString()}</p>
-              <div className="w-full h-[1px] bg-slate-100 mb-6"></div>
-
-              <div className="mb-6">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 block mb-3">Color / Tone</span>
-                <div className="flex flex-wrap gap-2">
-                  {(parseSupabaseArray(selectedProduct.colors).length > 0 ? parseSupabaseArray(selectedProduct.colors) : ['Standard']).map((c: string) => (
-                     <button key={c} onClick={() => setSelectedColor(c)} className={`px-4 py-2 text-[10px] md:text-xs tracking-wide uppercase transition border ${selectedColor === c ? 'border-amber-700 text-amber-800 bg-amber-50 font-bold' : 'border-slate-200 text-slate-600'}`}>{c}</button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="mb-8">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 block mb-3">Size / Fit</span>
-                <div className="flex flex-wrap gap-2">
-                  {(parseSupabaseArray(selectedProduct.sizes).length > 0 ? parseSupabaseArray(selectedProduct.sizes) : ['OS']).map((s: string) => (
-                     <button key={s} onClick={() => setSelectedSize(s)} className={`px-4 py-2 text-[10px] md:text-xs tracking-wide uppercase transition border ${selectedSize === s ? 'border-amber-700 text-amber-800 bg-amber-50 font-bold' : 'border-slate-200 text-slate-600'}`}>{s}</button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="mb-8 shrink-0 w-full">
-                <button disabled={selectedProduct.stock_count === 0} onClick={addToCart} className={`w-full py-4 px-4 text-[11px] md:text-[12px] font-bold tracking-widest uppercase transition text-center shadow-lg rounded-sm ${selectedProduct.stock_count === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-amber-700 hover:-translate-y-0.5'}`}>
-                  {selectedProduct.stock_count === 0 ? 'Out of Stock' : 'Add to Cart'}
-                </button>
-              </div>
-
-              <div className="w-full h-[1px] bg-slate-100 mb-6"></div>
-              <div className="pb-8">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-900 block mb-4">Product Details</span>
-                <FormattedDescription text={selectedProduct.description} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TOP NAVIGATION */}
-      <nav className="sticky top-0 left-0 w-full z-40 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-slate-100 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-6 md:px-16 h-16 md:h-20 flex items-center justify-between">
-          <div className="text-xl md:text-2xl font-serif font-bold tracking-widest text-slate-900">LUXE & CO.</div>
-          
-          <div className="hidden md:flex gap-8 text-[10px] font-bold tracking-widest uppercase text-slate-500">
-            <a href="#premium" className="hover:text-amber-700 transition duration-300">Premium Line</a>
-            <a href="#catalog" className="hover:text-amber-700 transition duration-300">Full Catalog</a>
-            <a href="#testimonials" className="hover:text-amber-700 transition duration-300">Testimonials</a>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <button onClick={() => setIsCartOpen(true)} className="relative text-slate-900 hover:text-amber-700 transition">
-              <ShoppingCart size={22} />
-              {cart.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-amber-600 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
-                  {cart.reduce((total, item) => total + item.quantity, 0)}
-                </span>
-              )}
-            </button>
-            <button className="md:hidden text-slate-900 hover:text-amber-700 transition" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        </div>
-        <div className={`md:hidden absolute top-16 left-0 w-full bg-white border-b border-slate-100 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-80 opacity-100 py-6' : 'max-h-0 opacity-0 py-0'}`}>
-          <div className="flex flex-col px-6 gap-6 text-xs tracking-widest uppercase font-bold text-slate-600">
-            <a href="#premium" onClick={() => setIsMobileMenuOpen(false)}>Premium Line</a>
-            <a href="#catalog" onClick={() => setIsMobileMenuOpen(false)}>Full Catalog</a>
-            <a href="#testimonials" onClick={() => setIsMobileMenuOpen(false)}>Testimonials</a>
-          </div>
-        </div>
-      </nav>
-
->>>>>>> d149389248901ff9c4c9c58dc9bb650f8cc2c454
-      {/* HERO SECTION */}
       <section className="relative pt-8 md:pt-16 pb-12 md:pb-24 px-6 md:px-16 bg-[#FDFBF7] border-b border-slate-100">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-8 md:gap-16">
           <div className="w-full md:w-1/2 relative z-10"><h1 className="text-4xl sm:text-5xl md:text-7xl font-serif leading-[1.1] mb-4 md:mb-6 text-slate-900">CROWNED IN <br />ELEGANCE.</h1>
@@ -502,14 +383,12 @@ export default function LuxePublicSite() {
         </div>
       </section>
 
-      {/* DYNAMIC FILTER BAR */}
       <div className="sticky top-[100px] md:top-[116px] z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 py-3 md:py-4 px-6 md:px-16 overflow-x-auto custom-scrollbar flex gap-2 md:gap-4 justify-start md:justify-center">
         {filters.map(filter => (
           <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-4 py-2 text-[10px] md:text-xs font-bold uppercase tracking-widest whitespace-nowrap transition border rounded-sm ${activeFilter === filter ? 'border-amber-700 text-amber-800 bg-amber-50' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>{filter}</button>
         ))}
       </div>
 
-      {/* MAIN CATALOG */}
       <section id="catalog" className="relative py-16 md:py-24 px-6 md:px-16 bg-[#FFFFFF]">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-end mb-8 md:mb-12">
@@ -532,7 +411,6 @@ export default function LuxePublicSite() {
             )}
           </div>
 
-          {/* LOAD MORE BUTTON */}
           {filteredProducts.length > visibleMain && (
             <div className="mt-12 flex justify-center">
               <button 
@@ -546,7 +424,6 @@ export default function LuxePublicSite() {
         </div>
       </section>
 
-      {/* PREMIUM COLLECTION */}
       <section id="premium" className="relative py-16 md:py-24 px-6 md:px-16 bg-[#FDFBF7] border-t border-slate-100">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-end mb-8 md:mb-12">
@@ -569,7 +446,6 @@ export default function LuxePublicSite() {
             )}
           </div>
 
-          {/* LOAD MORE BUTTON */}
           {premiumProducts.length > visiblePremium && (
             <div className="mt-12 flex justify-center">
               <button 
@@ -583,7 +459,6 @@ export default function LuxePublicSite() {
         </div>
       </section>
 
-      {/* BRAND WORLD / VERIFIED VENDORS */}
       {vendors.length > 0 && (
         <section className="relative py-20 px-6 md:px-16 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-950 border-t border-slate-800 shadow-inner">
           <div className="max-w-7xl mx-auto text-center">
@@ -608,7 +483,6 @@ export default function LuxePublicSite() {
         </section>
       )}
 
-      {/* TESTIMONIALS */}
       <section id="testimonials" className="relative py-16 md:py-24 px-6 md:px-16 bg-white border-t border-slate-100">
         <div className="max-w-7xl mx-auto">
           <h3 className="text-2xl md:text-4xl font-serif text-slate-900 text-center mb-10 md:mb-16">Client Testimonials</h3>
@@ -623,7 +497,7 @@ export default function LuxePublicSite() {
                   <div className="flex gap-1 text-amber-500 mb-6">
                     {[...Array(5)].map((_, idx) => <Star key={idx} size={16} fill="currentColor" />)}
                   </div>
-                  <p className="text-slate-600 leading-relaxed text-sm italic mb-8">"{testimonial.text}"</p>
+                  <p className="text-slate-600 leading-relaxed text-sm italic mb-8">&quot;{testimonial.text}&quot;</p>
                 </div>
                 <div>
                   <p className="font-bold text-slate-900 text-xs uppercase tracking-widest">{testimonial.name}</p>
@@ -635,7 +509,6 @@ export default function LuxePublicSite() {
         </div>
       </section>
       
-      {/* FOOTER */}
       <footer className="bg-slate-900 text-white pt-16 pb-8 px-6 md:px-16 border-t-4 border-amber-700">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 border-b border-slate-800 pb-10 mb-8">
           <div className="md:col-span-2">
@@ -659,52 +532,9 @@ export default function LuxePublicSite() {
         </div>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-[8px] md:text-[10px] uppercase tracking-widest text-slate-500 gap-4">
           <p>© {new Date().getFullYear()} LUXE & CO. ALL RIGHTS RESERVED.</p>
-          <p className="text-slate-600">CRAFTED BY <a href="/admin" className="hover:text-amber-500 transition font-bold">GUV'NOR MAGKK.</a></p>
+          <p className="text-slate-600">CRAFTED BY <a href="/admin" className="hover:text-amber-500 transition font-bold">GUV&apos;NOR MAGKK.</a></p>
         </div>
       </footer>
-      {/* LUXURY SUCCESS MODAL */}
-      {successOrder && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Blurred dark backdrop */}
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"></div>
-          
-          {/* Modal Card */}
-          <div className="relative bg-white w-full max-w-md rounded-none shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
-            {/* Top Accent Bar */}
-            <div className="h-1.5 w-full bg-amber-700"></div>
-            
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Package size={32} className="text-amber-700" />
-              </div>
-              
-              <h2 className="text-3xl font-serif text-slate-900 mb-2">Order Secured.</h2>
-              <p className="text-sm text-slate-500 mb-8">
-                Your luxury items are being prepared. You will receive an email confirmation shortly.
-              </p>
-              
-              <div className="bg-slate-50 border border-slate-100 p-4 mb-8">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                  Official Tracking Code
-                </p>
-                <p className="text-xl font-mono font-bold text-slate-900 tracking-wider">
-                  {successOrder.trackingCode}
-                </p>
-              </div>
-              
-              <button
-                onClick={() => {
-                  setSuccessOrder(null);
-                  window.location.href = '/track'; // Proceed to tracking
-                }}
-                className="w-full bg-[#0B1120] text-white text-xs font-bold uppercase tracking-widest py-4 hover:bg-amber-700 transition-colors duration-300 flex justify-center items-center gap-2"
-              >
-                Track My Order
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
