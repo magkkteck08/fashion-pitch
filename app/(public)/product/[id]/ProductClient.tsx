@@ -108,7 +108,7 @@ export default function ProductClient({ product }: { product: any }) {
         <Link href="/" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-colors">
           <ArrowLeft size={16} /> Store
         </Link>
-        <div className="text-xl font-serif font-bold tracking-widest text-slate-900">LUXE & CO.</div>
+        <div className="text-xl font-serif font-bold tracking-widest text-slate-900">MAGKK EXCLUSIVE.</div>
         <div className="w-16"></div> {/* Spacer */}
       </nav>
 

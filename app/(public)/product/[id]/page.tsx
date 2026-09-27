@@ -32,19 +32,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const product = await fetchProductData(resolvedParams.id);
 
   if (!product) {
-    return { title: 'Product Not Found | LUXE & CO.' };
+    return { title: 'Product Not Found | MAGKK EXCLUSIVE.' };
   }
 
   const mainImage = product.image_url || product.image;
 
   return {
-    title: `${product.name} | LUXE & CO.`,
-    description: `Secure the ${product.name} for ₦${Number(product.price).toLocaleString()}. Curated luxury fashion by LUXE & CO.`,
+    title: `${product.name} | MAGKK EXCLUSIVE.`,
+    description: `Secure the ${product.name} for ₦${Number(product.price).toLocaleString()}. Curated luxury fashion by MAGKK EXCLUSIVE.`,
     openGraph: {
       title: product.name,
-      description: `Secure the ${product.name} for ₦${Number(product.price).toLocaleString()}. Curated luxury fashion by LUXE & CO.`,
+      description: `Secure the ${product.name} for ₦${Number(product.price).toLocaleString()}. Curated luxury fashion by MAGKK EXCLUSIVE.`,
       url: `https://yourdomain.com/product/${product.id}`,
-      siteName: 'LUXE & CO.',
+      siteName: '',
       images: [{ url: mainImage, width: 800, height: 800, alt: product.name }],
       type: 'website',
     },

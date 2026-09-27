@@ -11,8 +11,30 @@ import LiveChat from "@/components/LiveChat";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "MAGKK EXCLUSIVE",
+  title: "MAGKK STORE",
   description: "Curated luxury fashion and premium apparel.",
+  openGraph: {
+    title: "MAGKK STORE",
+    description: "Curated luxury fashion and premium apparel.",
+    url: "https://magkkstore.vercel.app",
+    siteName: "MAGKK STORE",
+    images: [
+      {
+        url: "/hero.jpg", // This uses the hero image from your public folder
+        width: 1200,
+        height: 630,
+        alt: "MAGKK STORE Luxury Fashion",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MAGKK STORE",
+    description: "Curated luxury fashion and premium apparel.",
+    images: ["/hero.jpg"], 
+  },
 };
 
 export default function RootLayout({

@@ -174,7 +174,7 @@ export default function LuxePublicSite() {
         
         <nav className="w-full bg-[#FFFFFF]/95 backdrop-blur-md border-b border-slate-100 relative">
           <div className="max-w-7xl mx-auto px-6 md:px-16 h-16 md:h-20 flex items-center justify-between">
-            <div className="text-xl md:text-2xl font-serif font-bold tracking-widest text-slate-900">LUXE & CO.</div>
+            <div className="text-xl md:text-2xl font-serif font-bold tracking-widest text-slate-900">MAGKK STORE</div>
             
             <div className="hidden md:flex gap-8 text-[10px] font-bold tracking-widest uppercase text-slate-500">
               <a href="#premium" className="hover:text-amber-700 transition duration-300">Premium Line</a>
@@ -297,7 +297,7 @@ export default function LuxePublicSite() {
                   </div>
                   
                   <a
-                    href={`https://wa.me/2349073754047?text=Hello LUXE! I just placed an order. My Tracking Number is ${orderTrackingNumber}. Here is my payment proof for ₦${finalTotal.toLocaleString()}.`}
+                    href={`https://wa.me/2349073754047?text=Hello MAGKK STORE! I just placed an order. My Tracking Number is ${orderTrackingNumber}. Here is my payment proof for ₦${finalTotal.toLocaleString()}.`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full bg-[#25D366] text-white text-xs font-bold uppercase tracking-widest py-4 rounded-sm hover:bg-[#128C7E] transition-colors duration-300 flex justify-center items-center mb-4 shadow-lg"
@@ -378,7 +378,7 @@ export default function LuxePublicSite() {
             <a href="#catalog" className="inline-block bg-slate-900 text-white px-8 md:px-10 py-3.5 md:py-4 text-center font-bold uppercase tracking-widest text-[10px] md:text-xs hover:bg-amber-700 transition shadow-xl rounded-sm">Shop Collection</a>
           </div>
           <div className="w-full md:w-1/2 aspect-square md:aspect-[4/3] bg-slate-200 relative overflow-hidden rounded-sm shadow-sm">
-             <img src="/hero.jpg" alt="Luxe E-Commerce" className="absolute inset-0 w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/1200x800/eeeeee/999999?text=Hero+Image" }} />
+             <img src="/hero.jpg" alt="MAGKK STORE E-Commerce" className="absolute inset-0 w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/1200x800/eeeeee/999999?text=Hero+Image" }} />
           </div>
         </div>
       </section>
@@ -478,7 +478,7 @@ export default function LuxePublicSite() {
               ))}
             </div>
             
-            <p className="text-slate-400 text-[10px] uppercase tracking-widest mt-10">Every product is authenticated & guaranteed by LUXE & CO.</p>
+            <p className="text-slate-400 text-[10px] uppercase tracking-widest mt-10">Every product is authenticated & guaranteed by MAGKK STORE.</p>
           </div>
         </section>
       )}
@@ -489,7 +489,7 @@ export default function LuxePublicSite() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               { name: "Aisha T.", role: "Verified Buyer", text: "The quality of the premium bags is unmatched. It arrived exactly as pictured, beautifully packaged. I’ve never received so many compliments." },
-              { name: "Sarah M.", role: "VIP Client", text: "LUXE & CO. completely elevated my wardrobe. The detailing on their signature pieces proves they care about true luxury." },
+              { name: "Sarah M.", role: "VIP Client", text: "MAGKK STORE completely elevated my wardrobe. The detailing on their signature pieces proves they care about true luxury." },
               { name: "Chika O.", role: "Verified Buyer", text: "Seamless ordering process and exceptional customer service. The material feels incredible. Definitely my new go-to store." }
             ].map((testimonial, i) => (
               <div key={i} className="bg-[#FDFBF7] p-8 border border-slate-100 rounded-sm shadow-sm flex flex-col justify-between">
@@ -512,7 +512,7 @@ export default function LuxePublicSite() {
       <footer className="bg-slate-900 text-white pt-16 pb-8 px-6 md:px-16 border-t-4 border-amber-700">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 border-b border-slate-800 pb-10 mb-8">
           <div className="md:col-span-2">
-            <div className="text-2xl md:text-3xl font-serif font-bold tracking-widest mb-4">LUXE & CO.</div>
+            <div className="text-2xl md:text-3xl font-serif font-bold tracking-widest mb-4">MAGKK STORE</div>
             <p className="text-slate-400 font-light text-sm max-w-sm leading-relaxed">Premium fashion and lifestyle curated for the modern, unapologetic individual. Fast shipping, global delivery.</p>
           </div><div className="grid grid-cols-2 md:grid-cols-1 gap-8 md:gap-0">
             <div>
@@ -531,7 +531,7 @@ export default function LuxePublicSite() {
           </div>
         </div>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-[8px] md:text-[10px] uppercase tracking-widest text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} LUXE & CO. ALL RIGHTS RESERVED.</p>
+          <p>© {new Date().getFullYear()} MAGKK STORE. ALL RIGHTS RESERVED.</p>
           <p className="text-slate-600">CRAFTED BY <a href="/admin" className="hover:text-amber-500 transition font-bold">GUV&apos;NOR MAGKK.</a></p>
         </div>
       </footer>
