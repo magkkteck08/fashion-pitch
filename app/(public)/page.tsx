@@ -1,8 +1,22 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Menu, X, ImageIcon, Star, ShoppingCart, Trash2, Package } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+
+const NIGERIAN_STATES = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River",
+  "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo", "Jigawa", "Kaduna",
+  "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo",
+  "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
+];
+
+// UTILITY: Extracts the true Supabase UUID from composite cart IDs
+const extractUUID = (str: any) => {
+  if (!str) return null;
+  const match = String(str).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return match ? match[0] : null;
+};
 
 const parseSupabaseArray = (data: any) => {
   if (!data) return [];
@@ -47,7 +61,6 @@ export default function LuxePublicSite() {
   
   const [products, setProducts] = useState<any[]>([]);
   const [premiumProducts, setPremiumProducts] = useState<any[]>([]);
-  const [deliveryOptions, setDeliveryOptions] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([]); 
   
   const [activeFilter, setActiveFilter] = useState('All');
@@ -57,7 +70,10 @@ export default function LuxePublicSite() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [cart, setCart] = useState<any[]>([]);
+  const [cartDbItems, setCartDbItems] = useState<any[]>([]);
   const [isCartLoaded, setIsCartLoaded] = useState(false);
+  const [isSyncingCart, setIsSyncingCart] = useState(true);
+  
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
@@ -66,22 +82,16 @@ export default function LuxePublicSite() {
   const [orderTrackingNumber, setOrderTrackingNumber] = useState('');
   const [finalTotal, setFinalTotal] = useState(0); 
   
-  const [checkoutForm, setCheckoutForm] = useState({ name: '', email: '', phone: '', address: '' });
-  const [selectedDelivery, setSelectedDelivery] = useState<any | null>(null);
+  const [checkoutForm, setCheckoutForm] = useState({ name: '', email: '', phone: '', state: '', address: '' });
 
   useEffect(() => {
     async function loadData() {
       const { data: prodData } = await supabase.from('products').select('*').limit(40);
       const { data: premiumData } = await supabase.from('signature_products' as any).select('*').limit(40);
-      const { data: delData } = await supabase.from('delivery_options').select('*').order('fee', { ascending: true });
-      const { data: vendorData } = await supabase.from('verified_vendors').select('*').eq('status', 'active'); 
+      const { data: vendorData } = await supabase.from('verified_vendors').select('*'); 
       
       if (prodData) setProducts(prodData.map(p => ({ ...p, tableType: 'products' })));
       if (premiumData) setPremiumProducts(premiumData.map(p => ({ ...p, tableType: 'signature_products' })));
-      if (delData && delData.length > 0) {
-        setDeliveryOptions(delData);
-        setSelectedDelivery(delData[0]); 
-      }
       if (vendorData) setVendors(vendorData); 
     }
     loadData();
@@ -92,42 +102,120 @@ export default function LuxePublicSite() {
   }, [supabase]);
 
   useEffect(() => {
-    if (isCartLoaded) localStorage.setItem('luxe_cart', JSON.stringify(cart));
-  }, [cart, isCartLoaded]);
+    async function syncCartWithDB() {
+      if (cart.length === 0) {
+        setIsSyncingCart(false);
+        return;
+      }
+      
+      const itemIds = cart.map(item => extractUUID(item.productId) || extractUUID(item.id) || extractUUID(item.cartId)).filter(Boolean);
+      
+      if (itemIds.length === 0) {
+        setIsSyncingCart(false);
+        return;
+      }
 
-  const filteredProducts = activeFilter === 'All' 
-    ? products 
-    : products.filter(p => {
-        let searchTarget = activeFilter.toLowerCase();
-        if (searchTarget.endsWith('s') && searchTarget !== 'men' && searchTarget !== 'women') searchTarget = searchTarget.slice(0, -1);
-        const cat = (p.category || '').toLowerCase();
-        const tagsString = JSON.stringify(p.tags || []).toLowerCase();
-        return cat.includes(searchTarget) || tagsString.includes(searchTarget);
-      });
+      const { data: mainData } = await supabase.from('products').select('id, vendor_id').in('id', itemIds);
+      const { data: sigData } = await supabase.from('signature_products').select('id, vendor_id').in('id', itemIds);
 
-  const removeFromCart = (cartId: string) => setCart(cart.filter(c => c.cartId !== cartId));
+      setCartDbItems([...(mainData || []), ...(sigData || [])]);
+      setIsSyncingCart(false);
+    }
+    
+    if (isCartLoaded) {
+      syncCartWithDB();
+      localStorage.setItem('luxe_cart', JSON.stringify(cart));
+    }
+  }, [cart, isCartLoaded, supabase]);
+
+  const filteredProducts = activeFilter === 'All' ? products : products.filter(p => {
+    let searchTarget = activeFilter.toLowerCase();
+    if (searchTarget.endsWith('s') && searchTarget !== 'men' && searchTarget !== 'women') searchTarget = searchTarget.slice(0, -1);
+    const cat = (p.category || '').toLowerCase();
+    const tagsString = JSON.stringify(p.tags || []).toLowerCase();
+    return cat.includes(searchTarget) || tagsString.includes(searchTarget);
+  });
+
+  const removeFromCart = (cartId: string) => {
+    const newCart = cart.filter(c => c.cartId !== cartId);
+    setCart(newCart);
+    localStorage.setItem('luxe_cart', JSON.stringify(newCart));
+  };
+
+  const clearWholeCart = () => {
+    setCart([]);
+    localStorage.removeItem('luxe_cart');
+  };
   
   const updateQuantity = (cartId: string, amount: number) => {
-    setCart(cart.map(c => {
+    const newCart = cart.map(c => {
       if (c.cartId === cartId) {
         const newQty = c.quantity + amount;
-        if (newQty > c.maxStock) {
-          alert(`Maximum stock reached. Only ${c.maxStock} available.`);
-          return c;
-        }
+        if (newQty > c.maxStock) { alert(`Only ${c.maxStock} available.`); return c; }
         return newQty > 0 ? { ...c, quantity: newQty } : c;
       }
       return c;
-    }));
+    });
+    setCart(newCart);
+    localStorage.setItem('luxe_cart', JSON.stringify(newCart));
   };
 
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const deliveryFee = selectedDelivery ? Number(selectedDelivery.fee) : 0;
-  const grandTotal = cartTotal + deliveryFee;
+
+  const deliveryFee = useMemo(() => {
+    if (!checkoutForm.state) return null; 
+    if (isSyncingCart) return null; 
+
+    let fee = 0;
+    const processedVendors = new Set();
+    let hasInHouse = false;
+
+    cart.forEach((cartItem) => {
+      const targetId = extractUUID(cartItem.productId) || extractUUID(cartItem.id) || extractUUID(cartItem.cartId);
+      
+      const freshProduct = products.find(p => p.id === targetId) 
+                        || premiumProducts.find(p => p.id === targetId) 
+                        || cartDbItems.find(p => p.id === targetId);
+      
+      const vId = freshProduct?.vendor_id || cartItem.vendor_id;
+
+      if (vId) {
+        if (!processedVendors.has(vId)) {
+          processedVendors.add(vId);
+          const vendor = vendors.find(v => v.id === vId);
+          
+          if (vendor && vendor.state_delivery_fees) {
+            let stateFees = vendor.state_delivery_fees;
+            if (typeof stateFees === 'string') {
+              try { stateFees = JSON.parse(stateFees); } catch(e) { stateFees = {}; }
+            }
+            
+            if (stateFees[checkoutForm.state] !== undefined && stateFees[checkoutForm.state] !== null) {
+              fee += Number(stateFees[checkoutForm.state]);
+            } else if (stateFees['Default'] !== undefined && stateFees['Default'] !== null) {
+              fee += Number(stateFees['Default']);
+            } else {
+              fee += 3000;
+            }
+          }
+        }
+      } else {
+        if (!hasInHouse) {
+          hasInHouse = true;
+          fee += 3000; 
+        }
+      }
+    });
+    
+    return fee;
+  }, [cart, products, premiumProducts, cartDbItems, vendors, checkoutForm.state, isSyncingCart]);
+
+  const grandTotal = cartTotal + (deliveryFee || 0);
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cart.length === 0 || !selectedDelivery) return;
+    if (cart.length === 0) return;
+    if (!checkoutForm.state) return alert("Please select a delivery state.");
     setIsSubmittingOrder(true);
 
     try {
@@ -138,6 +226,7 @@ export default function LuxePublicSite() {
           fullName: checkoutForm.name,
           email: checkoutForm.email,
           phone: checkoutForm.phone,
+          deliveryState: checkoutForm.state,
           deliveryAddress: checkoutForm.address,
           items: cart,
           totalAmount: grandTotal
@@ -154,7 +243,7 @@ export default function LuxePublicSite() {
         setOrderTrackingNumber(data.trackingCode);
         setOrderSuccess(true);
       } else {
-        alert(`Error: ${data.error || 'Server did not provide an error message'}`);
+        alert(`Error: ${data.error || 'Server error'}`);
         setIsSubmittingOrder(false);
       }
     } catch (err) {
@@ -171,17 +260,14 @@ export default function LuxePublicSite() {
         <div className="bg-slate-900 text-amber-500 text-[9px] md:text-[10px] font-bold tracking-widest uppercase text-center py-2.5 px-4">
           Complimentary Global Shipping on Signature Orders over ₦250,000
         </div>
-        
         <nav className="w-full bg-[#FFFFFF]/95 backdrop-blur-md border-b border-slate-100 relative">
           <div className="max-w-7xl mx-auto px-6 md:px-16 h-16 md:h-20 flex items-center justify-between">
             <div className="text-xl md:text-2xl font-serif font-bold tracking-widest text-slate-900">MAGKK STORE</div>
-            
             <div className="hidden md:flex gap-8 text-[10px] font-bold tracking-widest uppercase text-slate-500">
               <a href="#premium" className="hover:text-amber-700 transition duration-300">Premium Line</a>
               <a href="#catalog" className="hover:text-amber-700 transition duration-300">Full Catalog</a>
               <a href="#testimonials" className="hover:text-amber-700 transition duration-300">Testimonials</a>
             </div>
-
             <div className="flex items-center gap-6">
               <button onClick={() => setIsCartOpen(true)} className="relative text-slate-900 hover:text-amber-700 transition">
                 <ShoppingCart size={22} />
@@ -191,7 +277,7 @@ export default function LuxePublicSite() {
                   </span>
                 )}
               </button>
-              <button className="md:hidden text-slate-900 hover:text-amber-700 transition" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              <button className="md:hidden text-slate-900" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
                 {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
             </div>
@@ -209,12 +295,18 @@ export default function LuxePublicSite() {
 
       <div className="h-[100px] md:h-[116px] w-full"></div>
       
+      {/* CART OVERLAY */}
       <div className={`fixed inset-0 z-[70] transition-opacity duration-300 ${isCartOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
         <div className={`absolute top-0 right-0 w-full md:w-[400px] h-full bg-white shadow-2xl flex flex-col transition-transform duration-300 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="flex items-center justify-between p-6 border-b border-slate-100">
-            <h2 className="text-xl font-serif text-slate-900">Your Cart ({cart.reduce((a, b) => a + b.quantity, 0)})</h2>
-            <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={20} /></button>
+            <h2 className="text-xl font-serif text-slate-900">Your Cart</h2>
+            <div className="flex items-center gap-4">
+              {cart.length > 0 && (
+                <button onClick={clearWholeCart} className="text-[10px] uppercase tracking-widest font-bold text-red-500 hover:text-red-700 transition border border-red-100 bg-red-50 px-3 py-1.5 rounded-sm">Empty Cart</button>
+              )}
+              <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={20} /></button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
             {cart.length === 0 ? (
@@ -254,6 +346,7 @@ export default function LuxePublicSite() {
         </div>
       </div>
 
+      {/* SECURE CHECKOUT MODAL */}
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 md:p-12">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => !orderSuccess && setIsCheckoutOpen(false)}></div>
@@ -271,16 +364,12 @@ export default function LuxePublicSite() {
                   </div>
                   <h3 className="text-3xl font-serif text-slate-900 mb-2">Order Secured.</h3>
                   <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
-                    Your order has been recorded. To begin processing your shipment, please complete your payment via bank transfer.
+                    To begin processing your shipment, please complete your payment via bank transfer.
                   </p>
                   
                   <div className="bg-slate-50 border border-slate-100 p-4 mb-6 inline-block w-full max-w-sm">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                      Official Tracking Code
-                    </p>
-                    <p className="text-2xl font-mono font-bold text-slate-900 tracking-wider">
-                      {orderTrackingNumber}
-                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Official Tracking Code</p>
+                    <p className="text-2xl font-mono font-bold text-slate-900 tracking-wider">{orderTrackingNumber}</p>
                   </div>
 
                   <div className="bg-amber-50 border border-amber-200 p-6 mb-8 text-left text-sm text-slate-800 rounded-sm mx-auto max-w-sm">
@@ -296,73 +385,72 @@ export default function LuxePublicSite() {
                     </div>
                   </div>
                   
-                  <a
-                    href={`https://wa.me/2349073754047?text=Hello MAGKK STORE! I just placed an order. My Tracking Number is ${orderTrackingNumber}. Here is my payment proof for ₦${finalTotal.toLocaleString()}.`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-[#25D366] text-white text-xs font-bold uppercase tracking-widest py-4 rounded-sm hover:bg-[#128C7E] transition-colors duration-300 flex justify-center items-center mb-4 shadow-lg"
-                  >
+                  <a href={`https://wa.me/2349073754047?text=Hello MAGKK STORE! I just placed an order. My Tracking Number is ${orderTrackingNumber}.`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white text-xs font-bold uppercase tracking-widest py-4 rounded-sm hover:bg-[#128C7E] transition-colors flex justify-center items-center mb-4">
                     Send Payment Proof on WhatsApp
                   </a>
 
-                  <button
-                    onClick={() => {
-                      setOrderSuccess(false);
-                      setIsCheckoutOpen(false);
-                      window.location.href = '/track'; 
-                    }}
-                    className="text-[10px] text-slate-500 uppercase tracking-widest font-bold hover:text-slate-900 transition-colors"
-                  >
-                    I will do this later (Go to Tracking)
+                  <button onClick={() => { window.location.href = '/track'; }} className="text-[10px] text-slate-500 uppercase tracking-widest font-bold hover:text-slate-900 transition-colors">
+                    Go to Tracking Page
                   </button>
                 </div>
               ) : (
                 <form onSubmit={handleCheckoutSubmit} className="space-y-6">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Delivery Method</label>
-                    <div className="grid grid-cols-1 gap-3">
-                      {deliveryOptions.map(option => (
-                        <label key={option.id} className={`flex items-center justify-between p-4 border rounded-sm cursor-pointer transition ${selectedDelivery?.id === option.id ? 'border-amber-700 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                          <div className="flex items-center gap-3">
-                            <input type="radio" name="delivery" checked={selectedDelivery?.id === option.id} onChange={() => setSelectedDelivery(option)} className="text-amber-700 focus:ring-amber-700" />
-                            <div>
-                              <p className="font-bold text-sm text-slate-900">{option.name}</p>
-                              <p className="text-[10px] text-slate-500 uppercase tracking-widest">{option.estimated_time}</p>
-                            </div>
-                          </div>
-                          <span className="font-bold text-amber-700">₦{Number(option.fee).toLocaleString()}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Full Name</label>
-                      <input required type="text" value={checkoutForm.name} onChange={(e) => setCheckoutForm({...checkoutForm, name: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition text-sm" placeholder="e.g. Jane Doe" />
+                      <input required type="text" value={checkoutForm.name} onChange={(e) => setCheckoutForm({...checkoutForm, name: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none text-sm" placeholder="e.g. Jane Doe" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Phone Number</label>
-                      <input required type="tel" value={checkoutForm.phone} onChange={(e) => setCheckoutForm({...checkoutForm, phone: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition text-sm" placeholder="e.g. 080..." />
+                      <input required type="tel" value={checkoutForm.phone} onChange={(e) => setCheckoutForm({...checkoutForm, phone: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none text-sm" placeholder="e.g. 080..." />
                     </div>
                   </div>
+                  
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Email Address</label>
-                    <input required type="email" value={checkoutForm.email} onChange={(e) => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition text-sm" placeholder="jane@example.com" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Full Delivery Address</label>
-                    <textarea required rows={3} value={checkoutForm.address} onChange={(e) => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition text-sm" placeholder="Street, City, State..." />
+                    <input required type="email" value={checkoutForm.email} onChange={(e) => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none text-sm" placeholder="jane@example.com" />
                   </div>
 
-                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="md:col-span-1">
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Delivery State</label>
+                      <select required value={checkoutForm.state} onChange={(e) => setCheckoutForm({...checkoutForm, state: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none text-sm bg-white">
+                        <option value="">Select a State</option>
+                        {NIGERIAN_STATES.map(state => (
+                          <option key={state} value={state}>{state}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Full Delivery Address</label>
+                      <textarea required rows={1} value={checkoutForm.address} onChange={(e) => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none text-sm" placeholder="Street, City, Area..." />
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-sm mt-4">
                     <div className="flex justify-between text-sm text-slate-600 mb-2"><span>Subtotal:</span> <span>₦{cartTotal.toLocaleString()}</span></div>
-                    <div className="flex justify-between text-sm text-slate-600 mb-4 border-b border-slate-200 pb-4"><span>Delivery Fee:</span> <span>₦{deliveryFee.toLocaleString()}</span></div>
-                    <div className="flex justify-between text-lg font-bold text-slate-900"><span>Grand Total:</span> <span className="text-amber-700">₦{grandTotal.toLocaleString()}</span></div>
+                    
+                    <div className="flex justify-between text-sm text-slate-600 mb-4 border-b border-slate-200 pb-4">
+                      <span>Delivery Fee:</span> 
+                      <span className={deliveryFee === null ? 'text-amber-600 font-medium text-xs' : 'text-slate-900 font-medium'}>
+                        {isSyncingCart ? 'Calculating...' : deliveryFee === null ? 'Select state to calculate' : deliveryFee === 0 ? 'Free' : `₦${deliveryFee.toLocaleString()}`}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between text-lg font-bold text-slate-900">
+                      <span>Grand Total:</span> 
+                      <span className="text-amber-700">
+                        {deliveryFee === null || isSyncingCart ? '---' : `₦${grandTotal.toLocaleString()}`}
+                      </span>
+                    </div>
                   </div>
 
-                  <button type="submit" disabled={isSubmittingOrder} className="w-full bg-slate-900 text-white py-4 mt-4 uppercase tracking-widest text-[11px] font-bold rounded-sm hover:bg-amber-700 transition flex justify-center items-center gap-2">
-                    {isSubmittingOrder ? 'Processing Order...' : `Complete Order • ₦${grandTotal.toLocaleString()}`}
+                  <button 
+                    type="submit" 
+                    disabled={isSubmittingOrder || deliveryFee === null || isSyncingCart} 
+                    className="w-full bg-slate-900 text-white py-4 mt-4 uppercase tracking-widest text-[11px] font-bold rounded-sm hover:bg-amber-700 transition flex justify-center items-center gap-2 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  >
+                    {isSubmittingOrder ? 'Processing Order...' : isSyncingCart ? 'Loading Pricing...' : deliveryFee === null ? 'Select State to Continue' : `Complete Order • ₦${grandTotal.toLocaleString()}`}
                   </button>
                 </form>
               )}
@@ -371,6 +459,7 @@ export default function LuxePublicSite() {
         </div>
       )}
 
+      {/* HERO SECTION */}
       <section className="relative pt-8 md:pt-16 pb-12 md:pb-24 px-6 md:px-16 bg-[#FDFBF7] border-b border-slate-100">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-8 md:gap-16">
           <div className="w-full md:w-1/2 relative z-10"><h1 className="text-4xl sm:text-5xl md:text-7xl font-serif leading-[1.1] mb-4 md:mb-6 text-slate-900">CROWNED IN <br />ELEGANCE.</h1>
@@ -383,12 +472,14 @@ export default function LuxePublicSite() {
         </div>
       </section>
 
+      {/* FILTER BUTTONS */}
       <div className="sticky top-[100px] md:top-[116px] z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 py-3 md:py-4 px-6 md:px-16 overflow-x-auto custom-scrollbar flex gap-2 md:gap-4 justify-start md:justify-center">
         {filters.map(filter => (
           <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-4 py-2 text-[10px] md:text-xs font-bold uppercase tracking-widest whitespace-nowrap transition border rounded-sm ${activeFilter === filter ? 'border-amber-700 text-amber-800 bg-amber-50' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>{filter}</button>
         ))}
       </div>
 
+      {/* MAIN CATALOG */}
       <section id="catalog" className="relative py-16 md:py-24 px-6 md:px-16 bg-[#FFFFFF]">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-end mb-8 md:mb-12">
@@ -413,10 +504,7 @@ export default function LuxePublicSite() {
 
           {filteredProducts.length > visibleMain && (
             <div className="mt-12 flex justify-center">
-              <button 
-                onClick={() => setVisibleMain(prev => prev + 10)} 
-                className="border border-slate-900 text-slate-900 px-8 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-900 hover:text-white transition"
-              >
+              <button onClick={() => setVisibleMain(prev => prev + 10)} className="border border-slate-900 text-slate-900 px-8 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-900 hover:text-white transition">
                 Load More Products
               </button>
             </div>
@@ -424,6 +512,7 @@ export default function LuxePublicSite() {
         </div>
       </section>
 
+      {/* PREMIUM LINE */}
       <section id="premium" className="relative py-16 md:py-24 px-6 md:px-16 bg-[#FDFBF7] border-t border-slate-100">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-end mb-8 md:mb-12">
@@ -448,10 +537,7 @@ export default function LuxePublicSite() {
 
           {premiumProducts.length > visiblePremium && (
             <div className="mt-12 flex justify-center">
-              <button 
-                onClick={() => setVisiblePremium(prev => prev + 10)} 
-                className="border border-slate-900 text-slate-900 px-8 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-900 hover:text-white transition"
-              >
+              <button onClick={() => setVisiblePremium(prev => prev + 10)} className="border border-slate-900 text-slate-900 px-8 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-900 hover:text-white transition">
                 Discover More Premium
               </button>
             </div>
@@ -459,6 +545,7 @@ export default function LuxePublicSite() {
         </div>
       </section>
 
+      {/* VENDOR SHOWCASE */}
       {vendors.length > 0 && (
         <section className="relative py-20 px-6 md:px-16 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-950 border-t border-slate-800 shadow-inner">
           <div className="max-w-7xl mx-auto text-center">
@@ -468,12 +555,7 @@ export default function LuxePublicSite() {
             <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
               {vendors.map((vendor) => (
                 <div key={vendor.id} className="group cursor-pointer">
-                  <img 
-                    src={vendor.logo_url} 
-                    alt={vendor.vendor_name} 
-                    className="h-10 md:h-14 object-contain transition duration-300 group-hover:scale-105"
-                    title={vendor.vendor_name}
-                  />
+                  <img src={vendor.logo_url} alt={vendor.vendor_name} className="h-10 md:h-14 object-contain transition duration-300 group-hover:scale-105" title={vendor.vendor_name} />
                 </div>
               ))}
             </div>
@@ -483,6 +565,7 @@ export default function LuxePublicSite() {
         </section>
       )}
 
+      {/* TESTIMONIALS */}
       <section id="testimonials" className="relative py-16 md:py-24 px-6 md:px-16 bg-white border-t border-slate-100">
         <div className="max-w-7xl mx-auto">
           <h3 className="text-2xl md:text-4xl font-serif text-slate-900 text-center mb-10 md:mb-16">Client Testimonials</h3>
@@ -509,12 +592,14 @@ export default function LuxePublicSite() {
         </div>
       </section>
       
+      {/* FOOTER */}
       <footer className="bg-slate-900 text-white pt-16 pb-8 px-6 md:px-16 border-t-4 border-amber-700">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 border-b border-slate-800 pb-10 mb-8">
           <div className="md:col-span-2">
             <div className="text-2xl md:text-3xl font-serif font-bold tracking-widest mb-4">MAGKK STORE</div>
             <p className="text-slate-400 font-light text-sm max-w-sm leading-relaxed">Premium fashion and lifestyle curated for the modern, unapologetic individual. Fast shipping, global delivery.</p>
-          </div><div className="grid grid-cols-2 md:grid-cols-1 gap-8 md:gap-0">
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-1 gap-8 md:gap-0">
             <div>
               <h4 className="text-[10px] font-bold tracking-widest uppercase text-slate-500 mb-4">Shop</h4>
               <ul className="space-y-3 text-xs font-light text-slate-300">

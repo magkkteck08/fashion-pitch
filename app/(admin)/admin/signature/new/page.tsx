@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -10,8 +10,11 @@ export default function AddSignatureStyle() {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
   const [loading, setLoading] = useState(false);
+  const [vendors, setVendors] = useState<any[]>([]);
+
   const [form, setForm] = useState({
     name: '',
+    vendor_id: '', // <-- Added vendor tracking
     category: 'Bags',
     price: '',
     description: '',
@@ -27,6 +30,24 @@ export default function AddSignatureStyle() {
   const availableTags = ['Bags', 'Shoes', 'Palm Wears', 'Cloth', 'Men', 'Women'];
   const availableColors = ['Black', 'White', 'Brown', 'Red', 'Blue', 'Gold', 'Silver', 'Nude', 'Custom'];
   const availableSizes = ['Small', 'Medium', 'Large', 'OS (One Size)', 'Custom'];
+
+  // <-- FETCH VENDORS ON LOAD -->
+  useEffect(() => {
+    async function fetchVendors() {
+      const { data } = await supabase
+        .from('verified_vendors')
+        .select('id, vendor_name')
+        .eq('status', 'active');
+        
+      if (data) {
+        setVendors(data);
+        if (data.length > 0) {
+          setForm(prev => ({ ...prev, vendor_id: data[0].id })); // Auto-select first vendor
+        }
+      }
+    }
+    fetchVendors();
+  }, [supabase]);
 
   const toggleArrayItem = (field: 'tags' | 'colors' | 'sizes', value: string) => {
     setForm(prev => {
@@ -47,9 +68,13 @@ export default function AddSignatureStyle() {
 
     setLoading(true);
 
+    const generatedSlug = form.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.floor(Math.random() * 1000);
+
     const { error } = await supabase.from('signature_products').insert([
       {
         name: form.name,
+        slug: generatedSlug,
+        vendor_id: form.vendor_id || null, // <-- Saving the selected vendor to DB
         category: form.category,
         price: parseFloat(form.price) || 0,
         description: form.description,
@@ -104,7 +129,17 @@ export default function AddSignatureStyle() {
               <input required type="text" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition" placeholder="e.g. Prada Lady Mini" />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            {/* UPGRADED GRID: Now 2 columns to fit the Vendor dropdown cleanly */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Vendor Brand</label>
+                <select value={form.vendor_id} onChange={(e) => setForm({...form, vendor_id: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition bg-white">
+                  <option value="">No Vendor (In-House)</option>
+                  {vendors.map(v => (
+                    <option key={v.id} value={v.id}>{v.vendor_name}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Category</label>
                 <select value={form.category} onChange={(e) => setForm({...form, category: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition bg-white">

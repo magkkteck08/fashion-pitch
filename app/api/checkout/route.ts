@@ -2,96 +2,113 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+const extractUUID = (str: any) => {
+  if (!str) return null;
+  const match = String(str).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return match ? match[0] : null;
+};
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    
-    const totalAmount = body.totalAmount || body.amount || body.grandTotal || 0;
-    const customerName = body.customerName || body.fullName || 'Guest Checkout';
-    const email = body.email || 'guest@example.com'; 
-    const phone = body.phone || '0000000000'; 
-    const address = body.deliveryAddress || 'No address provided';
-    const items = body.items || [];
-    
-    // 1. VALIDATE STOCK FIRST
-    for (const item of items) {
-      const table = item.tableType || 'products';
-      
-      const { data: productData, error: productError } = await supabase
-        .from(table)
-        .select('stock_count, name')
-        .eq('id', item.product_id)
-        .single();
+    const { fullName, email, phone, deliveryState, deliveryAddress, items, totalAmount } = body;
 
-      if (productError || !productData) {
-        return NextResponse.json({ success: false, error: `Product ${item.name} not found.` });
-      }
-
-      if (productData.stock_count < item.quantity) {
-        return NextResponse.json({ 
-          success: false, 
-          error: `Not enough stock for ${item.name}. Only ${productData.stock_count} remaining.` 
-        });
-      }
+    if (!items || items.length === 0) {
+      return NextResponse.json({ success: false, error: 'Cart is empty' }, { status: 400 });
+    }
+    
+    if (!deliveryState) {
+      return NextResponse.json({ success: false, error: 'Delivery state is required' }, { status: 400 });
     }
 
-    // 2. GENERATE ORDER TRACKING
-    const shortId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const trackingCode = `ORD-${shortId}`;
+    const trackingCode = 'ORD-' + Math.random().toString(16).slice(2, 8).toUpperCase();
+    const fullDeliveryAddress = `${deliveryAddress}, ${deliveryState} State`;
 
-    // 3. INSERT ORDER (Fixed Status to 'pending')
+    const { data: vendorsData } = await supabase.from('verified_vendors').select('*');
+    const vendors = vendorsData || [];
+
+    const itemIds = items.map((i: any) => extractUUID(i.productId) || extractUUID(i.id) || extractUUID(i.cartId)).filter(Boolean);
+    const { data: mainProducts } = await supabase.from('products').select('id, vendor_id').in('id', itemIds);
+    const { data: sigProducts } = await supabase.from('signature_products').select('id, vendor_id').in('id', itemIds);
+    const allDbProducts = [...(mainProducts || []), ...(sigProducts || [])];
+
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert([
         {
-          customer_name: customerName,
+          tracking_code: trackingCode,
+          customer_name: fullName,
           customer_email: email,
           customer_phone: phone,
-          delivery_address: address,
-          items: items, 
+          delivery_address: fullDeliveryAddress,
           total_amount: totalAmount,
-          tracking_code: trackingCode,
-          status: 'pending', // <--- Fixed this line
+          items: items, 
+          status: 'pending'
         }
       ])
       .select()
       .single();
 
-    if (orderError) throw new Error('Failed to save order to database');
-
-    // 4. AUTO-DEDUCT INVENTORY
-    for (const item of items) {
-      const table = item.tableType || 'products';
-      
-      const { data: currentProduct } = await supabase
-        .from(table)
-        .select('stock_count')
-        .eq('id', item.product_id)
-        .single();
-        
-      if (currentProduct) {
-        await supabase
-          .from(table)
-          .update({ stock_count: currentProduct.stock_count - item.quantity })
-          .eq('id', item.product_id);
-      }
+    if (orderError || !orderData) {
+      return NextResponse.json({ success: false, error: 'Failed to create order' }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Order processed successfully',
-      trackingCode: trackingCode,
-      orderId: orderData.id
+    const vendorGroups: Record<string, any> = {};
+    
+    items.forEach((item: any) => {
+      const targetId = extractUUID(item.productId) || extractUUID(item.id) || extractUUID(item.cartId);
+      const dbProduct = allDbProducts.find(p => p.id === targetId);
+      const vId = dbProduct?.vendor_id || item.vendor_id;
+      
+      if (!vendorGroups[vId]) {
+        vendorGroups[vId] = { items: [], subtotal: 0, delivery_fee: 0 };
+        
+        if (vId) {
+          const vendor = vendors.find(v => v.id === vId);
+          if (vendor && vendor.state_delivery_fees) {
+            let stateFees = vendor.state_delivery_fees;
+            if (typeof stateFees === 'string') {
+               try { stateFees = JSON.parse(stateFees); } catch(e) { stateFees = {}; }
+            }
+
+            if (stateFees[deliveryState] !== undefined && stateFees[deliveryState] !== null) {
+              vendorGroups[vId].delivery_fee = Number(stateFees[deliveryState]);
+            } else if (stateFees['Default'] !== undefined && stateFees['Default'] !== null) {
+              vendorGroups[vId].delivery_fee = Number(stateFees['Default']);
+            } else {
+              vendorGroups[vId].delivery_fee = 3000;
+            }
+          }
+        } else {
+          vendorGroups[vId].delivery_fee = 3000;
+        }
+      }
+      
+      vendorGroups[vId].items.push(item);
+      vendorGroups[vId].subtotal += (item.price * item.quantity);
     });
 
-  } catch (error) {
-    console.error('Manual Checkout Error:', error);
-    return NextResponse.json(
-      { error: 'Something went wrong processing your manual order.' }, 
-      { status: 500 }
-    );
+    const fulfillmentInserts = Object.keys(vendorGroups).map(vId => {
+       const group = vendorGroups[vId];
+       return {
+         order_id: orderData.id,
+         vendor_id: vId === 'undefined' || vId === 'null' ? null : vId,
+         vendor_subtotal: group.subtotal,
+         vendor_delivery_fee: group.delivery_fee,
+         items: group.items, 
+         status: 'pending'
+       };
+    });
+
+    await supabase.from('order_fulfillments').insert(fulfillmentInserts);
+
+    return NextResponse.json({ success: true, trackingCode });
+
+  } catch (err: any) {
+    console.error('Checkout API Crash:', err);
+    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
 }

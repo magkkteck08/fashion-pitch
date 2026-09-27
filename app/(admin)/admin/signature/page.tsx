@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Edit } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminPremiumPage() {
@@ -85,9 +85,14 @@ export default function AdminPremiumPage() {
                   </span>
                 </td>
                 <td className="py-4 pl-4 text-right">
-                  <button onClick={() => deleteProduct(product.id)} className="text-red-400 hover:text-red-700 transition">
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex items-center justify-end gap-4">
+                    <Link href={`/admin/signature/edit/${product.id}`} className="text-slate-400 hover:text-amber-700 transition">
+                      <Edit size={16} />
+                    </Link>
+                    <button onClick={() => deleteProduct(product.id)} className="text-red-400 hover:text-red-700 transition">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

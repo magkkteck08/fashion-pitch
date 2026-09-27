@@ -1,25 +1,29 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Save, Loader2, Trash2 } from 'lucide-react';
 import ImageUpload from '@/components/ImageUpload';
 
-export default function AddProduct() {
+export default function EditProduct({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const resolvedParams = use(params);
+  const productId = resolvedParams.id;
+  
   const [supabase] = useState(() => createClient());
   const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [vendors, setVendors] = useState<any[]>([]);
-  
+
   const [form, setForm] = useState({
     name: '',
-    vendor_id: '', // <-- Added vendor tracking
+    vendor_id: '', 
     category: 'Bags',
     price: '',
     description: '',
     status: 'Active',
-    stock_count: '10',
+    stock_count: '0',
     image_url: '',
     additional_images: [] as string[],
     tags: [] as string[],
@@ -31,23 +35,43 @@ export default function AddProduct() {
   const availableColors = ['Black', 'White', 'Brown', 'Red', 'Blue', 'Gold', 'Silver', 'Nude', 'Custom'];
   const availableSizes = ['Small', 'Medium', 'Large', 'OS (One Size)', 'Custom'];
 
-  // <-- FETCH VENDORS ON LOAD -->
   useEffect(() => {
-    async function fetchVendors() {
-      const { data } = await supabase
+    async function loadData() {
+      const { data: vendorData } = await supabase
         .from('verified_vendors')
         .select('id, vendor_name')
         .eq('status', 'active');
         
-      if (data) {
-        setVendors(data);
-        if (data.length > 0) {
-          setForm(prev => ({ ...prev, vendor_id: data[0].id })); // Auto-select first vendor
-        }
+      if (vendorData) setVendors(vendorData);
+
+      const { data: productData, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (productData) {
+        setForm({
+          name: productData.name || '',
+          vendor_id: productData.vendor_id || '',
+          category: productData.category || 'Bags',
+          price: productData.price?.toString() || '',
+          description: productData.description || '',
+          status: productData.status || 'Active',
+          stock_count: productData.stock_count?.toString() || '0',
+          image_url: productData.image_url || '',
+          additional_images: productData.additional_images || [],
+          tags: productData.tags || [],
+          colors: productData.colors || [],
+          sizes: productData.sizes || []
+        });
+      } else if (error) {
+        alert('Could not load product details.');
       }
+      setInitialLoad(false);
     }
-    fetchVendors();
-  }, [supabase]);
+    loadData();
+  }, [supabase, productId]);
 
   const toggleArrayItem = (field: 'tags' | 'colors' | 'sizes', value: string) => {
     setForm(prev => {
@@ -64,13 +88,11 @@ export default function AddProduct() {
     if (!form.image_url) return alert("Please upload a cover image first.");
     setLoading(true);
 
-    const generatedSlug = form.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.floor(Math.random() * 1000);
-
-    const { error } = await supabase.from('products').insert([
-      {
+    const { error } = await supabase
+      .from('products')
+      .update({
         name: form.name,
-        slug: generatedSlug,
-        vendor_id: form.vendor_id || null, // <-- Saving the selected vendor to DB
+        vendor_id: form.vendor_id || null, 
         category: form.category,
         price: parseFloat(form.price) || 0,
         description: form.description,
@@ -81,24 +103,26 @@ export default function AddProduct() {
         sizes: form.sizes,
         image_url: form.image_url,
         additional_images: form.additional_images
-      }
-    ]);
+      })
+      .eq('id', productId);
 
     setLoading(false);
-    if (error) alert(`Error saving item: ${error.message}`);
+    if (error) alert(`Error updating item: ${error.message}`);
     else router.push('/admin/products');
   };
 
   const handleAddExtraImage = (url: string) => setForm({ ...form, additional_images: [...form.additional_images, url] });
   const handleRemoveExtraImage = (indexToRemove: number) => setForm({ ...form, additional_images: form.additional_images.filter((_, idx) => idx !== indexToRemove) });
 
+  if (initialLoad) return <div className="p-12 text-center text-slate-500 text-xs font-bold uppercase tracking-widest">Loading Product Data...</div>;
+
   return (
     <div className="max-w-5xl mx-auto pb-12">
       <div className="flex items-center gap-4 mb-10">
         <Link href="/admin/products" className="p-2 bg-white border border-slate-200 rounded-sm hover:bg-slate-50 transition"><ArrowLeft size={20} className="text-slate-600" /></Link>
         <div>
-          <h1 className="text-3xl font-serif text-slate-900 mb-1">Add Catalog Item</h1>
-          <p className="text-slate-500">Upload a new item to the main storefront.</p>
+          <h1 className="text-3xl font-serif text-slate-900 mb-1">Edit Catalog Item</h1>
+          <p className="text-slate-500">Update details for this main catalog product.</p>
         </div>
       </div>
 
@@ -107,10 +131,9 @@ export default function AddProduct() {
           <div className="lg:col-span-3 space-y-6">
             <div>
               <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Item Name</label>
-              <input required type="text" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition" placeholder="e.g. Classic Tote" />
+              <input required type="text" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition" />
             </div>
 
-            {/* UPGRADED GRID: Now 2 columns to fit the Vendor dropdown cleanly */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Vendor Brand</label>
@@ -135,15 +158,22 @@ export default function AddProduct() {
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Price (₦)</label>
-                <input required type="number" value={form.price} onChange={(e) => setForm({...form, price: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition" placeholder="25000" />
+                <input required type="number" value={form.price} onChange={(e) => setForm({...form, price: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition" />
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Stock Count</label>
-                <input required type="number" value={form.stock_count} onChange={(e) => setForm({...form, stock_count: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition" placeholder="10" />
+                <input required type="number" value={form.stock_count} onChange={(e) => setForm({...form, stock_count: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition" />
               </div>
             </div>
 
-            {/* SELECTION WIDGETS */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Status</label>
+              <select value={form.status} onChange={(e) => setForm({...form, status: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition bg-white">
+                <option value="Active">Active (Visible to Clients)</option>
+                <option value="Draft">Draft (Hidden)</option>
+              </select>
+            </div>
+
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Filter Tags</label>
@@ -153,7 +183,6 @@ export default function AddProduct() {
                   ))}
                 </div>
               </div>
-              
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Available Colors</label>
                 <div className="flex flex-wrap gap-2">
@@ -162,7 +191,6 @@ export default function AddProduct() {
                   ))}
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Available Sizes</label>
                 <div className="flex flex-wrap gap-2">
@@ -174,8 +202,8 @@ export default function AddProduct() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Description (Markdown Supported)</label>
-              <textarea required rows={5} value={form.description} onChange={(e) => setForm({...form, description: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition" placeholder="Use - for bullet points and **text** for bolding." />
+              <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Description</label>
+              <textarea required rows={5} value={form.description} onChange={(e) => setForm({...form, description: e.target.value})} className="w-full border border-slate-200 p-3 rounded-sm focus:border-amber-500 outline-none transition" />
             </div>
           </div>
 
@@ -217,7 +245,7 @@ export default function AddProduct() {
         <div className="bg-slate-50 p-6 border-t border-slate-200 flex justify-end">
           <button type="submit" disabled={loading} className="bg-slate-900 text-white px-8 py-3 rounded-sm font-bold uppercase tracking-widest text-xs hover:bg-amber-700 transition flex items-center gap-2">
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            {loading ? 'Saving Item...' : 'Save Catalog Item'}
+            {loading ? 'Updating Item...' : 'Update Catalog Item'}
           </button>
         </div>
       </form>
